@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.13)
 
 set(OBJ lpmc)
-set(CMAKE_C_COMPILER "icc")
+set(CMAKE_C_COMPILER "icx")
 
 project(${OBJ} LANGUAGES C)
 find_package(MKL CONFIG REQUIRED)
 find_package(OpenMP)
 
 include_directories(include)
+include_directories(examples)
 file(GLOB SOURCES "src/*.c")
 add_executable(${OBJ} ${SOURCES})
 set(CMAKE_C_FLAGS_RELEASE "-O3")

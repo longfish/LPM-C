@@ -13,7 +13,6 @@
 ******************************************************************************/
 
 #include "lpm.h"
-// #include "examples/ex0_elasticity_3d.c"
 
 /* definition of global variables */
 /* int */
@@ -207,10 +206,10 @@ int main(int argc, char *argv[])
 
     // elasticity or plasticity model settings
     // (0) stress-based J2 plasticity, mixed-linear hardening
-    // plmode = 0;
-    // sigmay = allocDouble1D(nparticle, 200); // initial yield stress, Pa
-    // J2_xi = 0.0;                            // 0 for isotropic and 1 for kinematic hardening
-    // J2_H = 38.714e3;                        // isotropic hardening modulus, Pa
+    plmode = 0;
+    sigmay = allocDouble1D(nparticle, 200); // initial yield stress, Pa
+    J2_xi = 0.0;                            // 0 for isotropic and 1 for kinematic hardening
+    J2_H = 38.714e3;                        // isotropic hardening modulus, Pa
 
     // (1) rate-dependent crystal plasticity based on Miehe 2001
     // plmode = 1;
@@ -232,7 +231,7 @@ int main(int argc, char *argv[])
     // J2_C = 0.0; // kinematic hardening modulus, MPa
 
     // (6) elastic (brittle) material
-    plmode = 6;
+    // plmode = 6;
 
     printf("Constitutive mode is %d\n", plmode);
 
@@ -273,7 +272,7 @@ int main(int argc, char *argv[])
     char bforceFile[] = "result_bforce.txt";
 
     // boundary conditions and whole simulation settings
-    int n_steps = 5;           // number of loading steps
+    int n_steps = 91;           // number of loading steps
     dtime = 0.01;               // time step, s
     double step_size = -2000.0; // step size for force or displacement loading
     // int n_steps = 10;        // number of loading steps
@@ -295,7 +294,33 @@ int main(int argc, char *argv[])
     // }
 
     // force boundary conditions
-    for (int i = 0; i < n_steps; i++)
+    for (int i = 0; i < 14; i++)
+    {
+        load_indicator[i] = 1;
+
+        nbd = 0;
+        dBP[i][nbd].type = 1, dBP[i][nbd].flag = 'z', dBP[i][nbd++].step = 0.0;
+
+        nbf = 0;
+        fBP[i][nbf].type = 2;
+        fBP[i][nbf].flag1 = 'x', fBP[i][nbf].step1 = 0.0;
+        fBP[i][nbf].flag2 = 'y', fBP[i][nbf].step2 = 0.0;
+        fBP[i][nbf].flag3 = 'z', fBP[i][nbf++].step3 = step_size;
+    }
+    for (int i = 14; i < 48; i++)
+    {
+        load_indicator[i] = 1;
+
+        nbd = 0;
+        dBP[i][nbd].type = 1, dBP[i][nbd].flag = 'z', dBP[i][nbd++].step = 0.0;
+
+        nbf = 0;
+        fBP[i][nbf].type = 2;
+        fBP[i][nbf].flag1 = 'x', fBP[i][nbf].step1 = 0.0;
+        fBP[i][nbf].flag2 = 'y', fBP[i][nbf].step2 = 0.0;
+        fBP[i][nbf].flag3 = 'z', fBP[i][nbf++].step3 = -step_size;
+    }
+    for (int i = 48; i < n_steps; i++)
     {
         load_indicator[i] = 1;
 
@@ -377,7 +402,7 @@ int main(int argc, char *argv[])
         setDispBC(nbd, dBP[i]);  // update displacement BC
         setForceBC(nbf, fBP[i]); // update force BC
 
-        computeBondForceGeneral(plmode, load_indicator[i]); // incremental updating
+        computeBondForceGeneral(4, load_indicator[i]); // incremental updating
         omp_set_num_threads(nt);
 
     label_broken_bond:
@@ -426,7 +451,7 @@ int main(int argc, char *argv[])
             // printf("Solve the linear system costs %f seconds\n", time_t1 - time_t2);
 
             omp_set_num_threads(nt_force);
-            computeBondForceGeneral(4, load_indicator[i]); // update the bond force
+            computeBondForceGeneral(plmode, load_indicator[i]); // update the bond force
             omp_set_num_threads(nt);
 
             // time_t2 = omp_get_wtime();
@@ -434,7 +459,7 @@ int main(int argc, char *argv[])
 
             // writeDlambda(dlambdaFile, 9039, 9047, i + 1, ni);
 
-            updateRR(); /* update the RHS risidual force vector */
+            updateRR(ni++); /* update the RHS risidual force vector */
             norm_residual = cblas_dnrm2(dim * nparticle, residual, 1);
             printf("Norm of residual is %.3e, residual ratio is %.3e\n", norm_residual, norm_residual / tol_multiplier);
         }
@@ -448,6 +473,29 @@ int main(int argc, char *argv[])
         printf("Loading step %d has finished in %d iterations\n\nData output ...\n", i + 1, ni);
 
         /* ----------------------- data output setting section ------------------------ */
+
+        // test the strain measure
+        // int ii = 1429;
+        // printDouble(F[ii], 1, nneighbors);
+        // printDouble(bond_stress[ii], 1, nneighbors);
+        // printDouble(stress_tensor[ii], 1, 2 * NDIM);
+        // printDouble(dL[ii], 1, nneighbors);
+
+        // double strain_tensor[2 * NDIM] = {0.0};
+        // strain_tensor[0] = ((1 - mu0) * stress_tensor[ii][0] - mu0 * stress_tensor[ii][1]) * (1 + mu0) / E0;
+        // strain_tensor[1] = (-mu0 * stress_tensor[ii][0] + (1 - mu0) * stress_tensor[ii][1]) * (1 + mu0) / E0;
+        // strain_tensor[5] = stress_tensor[ii][5] * (1 + mu0) / E0;
+        // double xi[8] = {0.0};
+        // for (int j = 0; j < nb_initial[ii]; j++)
+        // {
+        //     xi[j] = distance_initial[ii][j] * (strain_tensor[0] * csx[ii][j] * csx[ii][j] +
+        //                                        strain_tensor[1] * csy[ii][j] * csy[ii][j] +
+        //                                        strain_tensor[2] * csz[ii][j] * csz[ii][j] +
+        //                                        2 * strain_tensor[3] * csy[ii][j] * csz[ii][j] +
+        //                                        2 * strain_tensor[4] * csx[ii][j] * csz[ii][j] +
+        //                                        2 * strain_tensor[5] * csx[ii][j] * csy[ii][j]);
+        // }
+        // printDouble(xi, 1, nneighbors);
 
         if ((i + 1) % out_step == 0)
         {
