@@ -6,8 +6,10 @@
 
 #include "lpm.h"
 
+struct UnitCell;
+
 /* switch the state variables from the converged one to the current one (flag=0) or vice versa (flag=1) or gather together (flag=2) */
-void switchStateV(int conv_flag)
+void switchStateV(int conv_flag, struct UnitCell cell)
 {
 
     if (conv_flag == 0)
@@ -15,7 +17,7 @@ void switchStateV(int conv_flag)
 #pragma omp parallel for
         for (int i = 0; i < nparticle; i++)
         {
-            for (int j = 0; j < nneighbors; j++)
+            for (int j = 0; j < cell.nneighbors; j++)
             {
                 dLp[i][j][0] = dLp[i][j][1];
                 damage_D[i][j][0] = damage_D[i][j][1];
@@ -40,7 +42,7 @@ void switchStateV(int conv_flag)
 #pragma omp parallel for
         for (int i = 0; i < nparticle; i++)
         {
-            for (int j = 0; j < nneighbors; j++)
+            for (int j = 0; j < cell.nneighbors; j++)
             {
                 dLp[i][j][1] = dLp[i][j][0];
                 damage_D[i][j][1] = damage_D[i][j][0];
@@ -65,7 +67,7 @@ void switchStateV(int conv_flag)
 #pragma omp parallel for
         for (int i = 0; i < nparticle; i++)
         {
-            for (int j = 0; j < nneighbors; j++)
+            for (int j = 0; j < cell.nneighbors; j++)
             {
                 dLp[i][j][0] = dLp[i][j][2];
             }
@@ -85,7 +87,7 @@ void switchStateV(int conv_flag)
 }
 
 /* compute the bond force and the state variables using constitutive relationship determined by plmode */
-void computeBondForceGeneral(int plmode, int t)
+void computeBondForceGeneral(int plmode, int t, struct UnitCell cell)
 {
     // double el_radius = 7.0;
     // double pc1[3] = {10.0, 13.0, 0.0}, pc2[3] = {10.0, 35.0, 0.0};
@@ -95,7 +97,7 @@ void computeBondForceGeneral(int plmode, int t)
 #pragma omp parallel for
         for (int iID = 0; iID < nparticle; iID++)
         {
-            computeBondForceJ2mixedLinear3D(iID);
+            computeBondForceJ2mixedLinear3D(iID, cell);
             // double disq1 = pow(xyz[iID][0] - pc1[0], 2.0) + pow(xyz[iID][1] - pc1[1], 2.0);
             // double disq2 = pow(xyz[iID][0] - pc2[0], 2.0) + pow(xyz[iID][1] - pc2[1], 2.0);
             // if (type[iID] >= 1 && type[iID] <= 6)
@@ -114,49 +116,49 @@ void computeBondForceGeneral(int plmode, int t)
         memset(state_v, 0, nparticle * sizeof(int)); // initialize the state variables flag
         // #pragma omp parallel for
         for (int iID = 0; iID < nparticle; iID++)
-            computeBondForceCPMiehe(iID);
+            computeBondForceCPMiehe(iID, cell);
     }
     else if (plmode == 3)
     {
 #pragma omp parallel for
         for (int iID = 0; iID < nparticle; iID++)
-            computeBondForceJ2energyReturnMap(iID, t);
+            computeBondForceJ2energyReturnMap(iID, t, cell);
     }
     else if (plmode == 4)
     {
 #pragma omp parallel for
         for (int iID = 0; iID < nparticle; iID++)
-            computeBondForceIncrementalUpdating(iID);
+            computeBondForceIncrementalUpdating(iID, cell);
     }
     else if (plmode == 5)
     {
 #pragma omp parallel for
         for (int iID = 0; iID < nparticle; iID++)
-            computeBondForceJ2nonlinearIso(iID);
+            computeBondForceJ2nonlinearIso(iID, cell);
     }
     else if (plmode == 6)
     {
 #pragma omp parallel for
         for (int iID = 0; iID < nparticle; iID++)
-            computeBondForceElastic(iID);
+            computeBondForceElastic(iID, cell);
     }
 
-    computeStress();
-    switchStateV(2); // gather together the pointwise state variables
+    computeStress(cell);
+    switchStateV(2, cell); // gather together the pointwise state variables
 }
 
 /* update the damage variables */
-int updateDamageGeneral(const char *dataName, int tstep, int plmode)
+int updateDamageGeneral(const char *dataName, int tstep, int plmode, struct UnitCell cell)
 {
     int broken = 0;
 
     if (plmode == 0)
-        broken = updateDuctileDamagePwiseNonlocal(dataName, tstep);
+        broken = updateDuctileDamagePwiseNonlocal(dataName, tstep, cell);
     // broken = updateDuctileDamagePwiseLocal(dataName, tstep);
     // broken = updateDuctileDamageBwiseNonlocal(dataName, tstep);
     // broken = updateDuctileDamageBwiseLocal(dataName, tstep);
     else if (plmode == 5)
-        broken = updateDuctileDamageBwiseLocal(dataName, tstep);
+        broken = updateDuctileDamageBwiseLocal(dataName, tstep, cell);
     else if (plmode == 6)
         broken = updateBrittleDamage(dataName, tstep, nbreak);
 
@@ -164,12 +166,12 @@ int updateDamageGeneral(const char *dataName, int tstep, int plmode)
 }
 
 /* Incremental updating (elastic) in general and for Wei's algorithm, trial */
-void computeBondForceIncrementalUpdating(int ii)
+void computeBondForceIncrementalUpdating(int ii, struct UnitCell cell)
 {
     // create a temporary list to store particle ii and all of its neighbors ID
     int *temporary_nb = allocInt1D(nb[ii] + 1, ii);
     int s = 1;
-    for (int k = 1; k < nneighbors + 1; k++)
+    for (int k = 1; k < cell.nneighbors + 1; k++)
     {
         if (damage_broken[ii][k - 1] > EPS && neighbors[ii][k - 1] != -1)
             temporary_nb[s++] = neighbors[ii][k - 1];
@@ -225,12 +227,12 @@ void computeBondForceIncrementalUpdating(int ii)
 }
 
 /* Elastic material law */
-void computeBondForceElastic(int ii)
+void computeBondForceElastic(int ii, struct UnitCell cell)
 {
     // create a temporary list to store particle ii and all of its neighbors ID
     int *temporary_nb = allocInt1D(nb[ii] + 1, ii);
     int s = 1;
-    for (int k = 1; k < nneighbors + 1; k++)
+    for (int k = 1; k < cell.nneighbors + 1; k++)
     {
         if (damage_broken[ii][k - 1] > EPS && neighbors[ii][k - 1] != -1)
             temporary_nb[s++] = neighbors[ii][k - 1];
@@ -283,12 +285,12 @@ void computeBondForceElastic(int ii)
 }
 
 /* Energy-based return-mapping algorithm for J2 plasticity */
-void computeBondForceJ2energyReturnMap(int ii, int load_indicator)
+void computeBondForceJ2energyReturnMap(int ii, int load_indicator, struct UnitCell cell)
 {
     // create a temporary list to store particle ii and all of its neighbors ID
     int *temporary_nb = allocInt1D(nb[ii] + 1, ii);
     int s = 1;
-    for (int k = 1; k < nneighbors + 1; k++)
+    for (int k = 1; k < cell.nneighbors + 1; k++)
     {
         if (damage_broken[ii][k - 1] > EPS && neighbors[ii][k - 1] != -1)
             temporary_nb[s++] = neighbors[ii][k - 1];
@@ -298,13 +300,13 @@ void computeBondForceJ2energyReturnMap(int ii, int load_indicator)
     double *xJ2_alpha = allocDouble1D(nb[ii] + 1, 0.0);         /* accumulated equivalent plasticity strain */
     double *xJ2_beta_eq = allocDouble1D(nb[ii] + 1, 0.0);       /* equivilent back stress */
     double *xJ2_dlambda = allocDouble1D(nb[ii] + 1, 0.0);       /* plasticity multiplier */
-    double **xdLp = allocDouble2D(nb[ii] + 1, nneighbors, 0.0); /* plastic bond stretch */
+    double **xdLp = allocDouble2D(nb[ii] + 1, cell.nneighbors, 0.0); /* plastic bond stretch */
 
     // store the previous step state variables (history dependent) for the particles in above list
     for (int k = 0; k < nb[ii] + 1; k++)
     {
         int i = temporary_nb[k]; // global index for the particle
-        for (int j = 0; j < nneighbors; j++)
+        for (int j = 0; j < cell.nneighbors; j++)
             xdLp[k][j] = dLp[i][j][0];
         xJ2_beta_eq[k] = J2_beta_eq[i][0];
         xJ2_alpha[k] = J2_alpha[i][0];
@@ -336,12 +338,12 @@ void computeBondForceJ2energyReturnMap(int ii, int load_indicator)
     for (int k = 0; k < nb[ii] + 1; k++)
     {
         int i = temporary_nb[k];
-        int nb1 = countNEqual(neighbors1[i], nneighbors1, -1); /* number of neighbors layer-1 */
+        int nb1 = countNEqual(neighbors1[i], cell.nneighbors1, -1); /* number of neighbors layer-1 */
         int nb2 = nb[i] - nb1;                                 /* number of neighbors layer-2 */
 
         /* trial distortional energy U_d */
         double U_d = 0.0, J2_k = 0.0, J2_sigma = 0.0;
-        double J2_V = particle_volume * nb[i] / nneighbors; // modified particle volume
+        double J2_V = cell.particle_volume * nb[i] / cell.nneighbors; // modified particle volume
         for (int j = 0; j < nb[i]; j++)
         {
             if (nsign[i][j] == 0)
@@ -370,8 +372,8 @@ void computeBondForceJ2energyReturnMap(int ii, int load_indicator)
             {
                 /* note the yield function below is at the current timestep */
                 dlambda = (a + b) / 2.0;
-                yield_func = fabs(load_indicator * J2_sigma / (1.0 + 0.5 * dlambda) - (J2_beta_eq[i][0] + load_indicator * J2_xi * J2_H * dlambda * J2_sigma * sqrt(radius / J2_k / Ce[type[i]][2]) / 6.0 / (1.0 + 0.5 * dlambda))) -
-                             (sigmay[i] + (1.0 - J2_xi) * J2_H * J2_alpha[i][0] + (1.0 - J2_xi) * J2_H * dlambda * J2_sigma * sqrt(radius / J2_k / Ce[type[i]][2]) / 6.0 / (1.0 + 0.5 * dlambda));
+                yield_func = fabs(load_indicator * J2_sigma / (1.0 + 0.5 * dlambda) - (J2_beta_eq[i][0] + load_indicator * J2_xi * J2_H * dlambda * J2_sigma * sqrt(cell.radius / J2_k / Ce[type[i]][2]) / 6.0 / (1.0 + 0.5 * dlambda))) -
+                             (sigmay[i] + (1.0 - J2_xi) * J2_H * J2_alpha[i][0] + (1.0 - J2_xi) * J2_H * dlambda * J2_sigma * sqrt(cell.radius / J2_k / Ce[type[i]][2]) / 6.0 / (1.0 + 0.5 * dlambda));
 
                 /* change the bisection */
                 if (yield_func * ya < 0.0)
@@ -387,8 +389,8 @@ void computeBondForceJ2energyReturnMap(int ii, int load_indicator)
             }
         }
         xJ2_dlambda[k] = dlambda;
-        xJ2_alpha[k] += dlambda / (1.0 + 0.5 * dlambda) * sqrt(radius / 6.0 / J2_k * U_d / J2_V);                                                     // equivalent plastic strain
-        xJ2_beta_eq[k] = (xJ2_beta_eq[k] + load_indicator * J2_xi * J2_H * dlambda / (1.0 + 0.5 * dlambda) * sqrt(radius / 6.0 / J2_k * U_d / J2_V)); // equivalent back stress
+        xJ2_alpha[k] += dlambda / (1.0 + 0.5 * dlambda) * sqrt(cell.radius / 6.0 / J2_k * U_d / J2_V);                                                     // equivalent plastic strain
+        xJ2_beta_eq[k] = (xJ2_beta_eq[k] + load_indicator * J2_xi * J2_H * dlambda / (1.0 + 0.5 * dlambda) * sqrt(cell.radius / 6.0 / J2_k * U_d / J2_V)); // equivalent back stress
 
         /* incremental plastic bond stretch */
         double f_d = 0.0;
@@ -432,7 +434,7 @@ void computeBondForceJ2energyReturnMap(int ii, int load_indicator)
     Pin[i * NDIM] = 0.0, Pin[i * NDIM + 1] = 0.0, Pin[i * NDIM + 2] = 0.0; // initialize the internal force vector
     for (int j = 0; j < nb_initial[i]; j++)
     {
-        for (int jj = 0; jj < nneighbors; jj++)
+        for (int jj = 0; jj < cell.nneighbors; jj++)
         {
             if (neighbors[neighbors[i][j]][jj] == i) /* find the opposite particle */
                 dL_ave[i][j] = 0.5 * (dL[i][j] + dL[neighbors[i][j]][jj]);
@@ -448,7 +450,7 @@ void computeBondForceJ2energyReturnMap(int ii, int load_indicator)
     }
 
     // store the state variables for the particle itself
-    for (int j = 0; j < nneighbors; j++)
+    for (int j = 0; j < cell.nneighbors; j++)
         dLp[i][j][2] = damage_broken[i][j] * xdLp[0][j];
     J2_beta_eq[i][2] = xJ2_beta_eq[0];
     J2_alpha[i][2] = xJ2_alpha[0];
@@ -463,12 +465,12 @@ void computeBondForceJ2energyReturnMap(int ii, int load_indicator)
 }
 
 /* Elastoplastic material with a mixed linear hardening law */
-void computeBondForceJ2mixedLinear3D(int ii)
+void computeBondForceJ2mixedLinear3D(int ii, struct UnitCell cell)
 {
     // create a temporary list to store particle ii and all of its neighbors ID
     int *temporary_nb = allocInt1D(nb[ii] + 1, ii);
     int s = 1;
-    for (int k = 1; k < nneighbors + 1; k++)
+    for (int k = 1; k < cell.nneighbors + 1; k++)
     {
         if (damage_broken[ii][k - 1] > EPS && neighbors[ii][k - 1] != -1)
             temporary_nb[s++] = neighbors[ii][k - 1];
@@ -476,7 +478,7 @@ void computeBondForceJ2mixedLinear3D(int ii)
 
     // allocate temporary variables to store state variables in previous time step
     double *xJ2_alpha = allocDouble1D(nb[ii] + 1, 0.0);           /* accumulated equivalent plasticity strain */
-    double **xdLp = allocDouble2D(nb[ii] + 1, nneighbors, 0.0);   /* plastic bond stretch */
+    double **xdLp = allocDouble2D(nb[ii] + 1, cell.nneighbors, 0.0);   /* plastic bond stretch */
     double **xJ2_beta = allocDouble2D(nb[ii] + 1, 2 * NDIM, 0.0); /* back stress */
     double *xJ2_dlambda = allocDouble1D(nb[ii] + 1, 0.0);         /* plasticity multiplier */
 
@@ -484,7 +486,7 @@ void computeBondForceJ2mixedLinear3D(int ii)
     for (int k = 0; k < nb[ii] + 1; k++)
     {
         int i = temporary_nb[k]; // global index for the particle
-        for (int j = 0; j < nneighbors; j++)
+        for (int j = 0; j < cell.nneighbors; j++)
             xdLp[k][j] = dLp[i][j][0];
         for (int j = 0; j < 2 * NDIM; j++)
             xJ2_beta[k][j] = J2_beta[i][j][0];
@@ -539,7 +541,7 @@ void computeBondForceJ2mixedLinear3D(int ii)
 
             /* check if there are any opposite bonds, if yes then 1 */
             double opp_flag = 1.0;
-            if (nb[i] == nneighbors)
+            if (nb[i] == cell.nneighbors)
                 opp_flag = 0.5; // there are opposite bond
             else
             {
@@ -559,12 +561,12 @@ void computeBondForceJ2mixedLinear3D(int ii)
             }
 
             // compute local stress tensor
-            stress_local[0] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csx[i][j];
-            stress_local[1] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csy[i][j];
-            stress_local[2] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csz[i][j] * csz[i][j];
-            stress_local[3] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csz[i][j];
-            stress_local[4] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csz[i][j];
-            stress_local[5] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csy[i][j];
+            stress_local[0] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csx[i][j];
+            stress_local[1] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csy[i][j];
+            stress_local[2] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csz[i][j] * csz[i][j];
+            stress_local[3] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csz[i][j];
+            stress_local[4] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csz[i][j];
+            stress_local[5] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csy[i][j];
         }
 
         /* update stress tensor to be trial devitoric stress tensor */
@@ -651,7 +653,7 @@ void computeBondForceJ2mixedLinear3D(int ii)
 
     for (int j = 0; j < nb_initial[i]; j++)
     {
-        for (int jj = 0; jj < nneighbors; jj++)
+        for (int jj = 0; jj < cell.nneighbors; jj++)
         {
             if (neighbors[neighbors[i][j]][jj] == i) /* find the opposite particle */
                 dL_ave[i][j] = 0.5 * (dL[i][j] + dL[neighbors[i][j]][jj]);
@@ -667,7 +669,7 @@ void computeBondForceJ2mixedLinear3D(int ii)
     }
 
     // store the state variables for the particle itself
-    for (int j = 0; j < nneighbors; j++)
+    for (int j = 0; j < cell.nneighbors; j++)
         dLp[i][j][2] = damage_broken[i][j] * xdLp[0][j];
     for (int j = 0; j < 2 * NDIM; j++)
         J2_beta[i][j][2] = xJ2_beta[0][j];
@@ -686,12 +688,12 @@ void computeBondForceJ2mixedLinear3D(int ii)
 }
 
 /* J2 plasticity using nonlinear isotropic hardening, then update damage (uncoupled) */
-void computeBondForceJ2nonlinearIso(int ii)
+void computeBondForceJ2nonlinearIso(int ii, struct UnitCell cell)
 {
     // create a temporary list to store particle ii and all of its neighbors ID
     int *temporary_nb = allocInt1D(nb[ii] + 1, ii);
     int s = 1;
-    for (int k = 1; k < nneighbors + 1; k++)
+    for (int k = 1; k < cell.nneighbors + 1; k++)
     {
         if (damage_broken[ii][k - 1] > EPS && neighbors[ii][k - 1] != -1)
             temporary_nb[s++] = neighbors[ii][k - 1];
@@ -729,7 +731,7 @@ void computeBondForceJ2nonlinearIso(int ii)
     for (int k = 0; k < nb[ii] + 1; k++)
     {
         int i = temporary_nb[k];
-        double J2_V = particle_volume * nb[i] / nneighbors; /* modified particle volume */
+        double J2_V = cell.particle_volume * nb[i] / cell.nneighbors; /* modified particle volume */
         for (int j = 0; j < nb_initial[i]; j++)
         {
             F[i][j] = 2.0 * Kn[i][j] * dL[i][j] + TdL_total[i][nsign[i][j]] + Tv[i][j] * dL_total[i][nsign[i][j]];
@@ -840,7 +842,7 @@ void computeBondForceJ2nonlinearIso(int ii)
 
     for (int j = 0; j < nb_initial[i]; j++)
     {
-        for (int jj = 0; jj < nneighbors; jj++)
+        for (int jj = 0; jj < cell.nneighbors; jj++)
         {
             if (neighbors[neighbors[i][j]][jj] == i) /* find the opposite particle */
                 dL_ave[i][j] = 0.5 * (dL[i][j] + dL[neighbors[i][j]][jj]);
@@ -863,12 +865,12 @@ void computeBondForceJ2nonlinearIso(int ii)
 }
 
 /* Crystalline material with plasticity, using Miehe's algorithm */
-void computeBondForceCPMiehe(int ii)
+void computeBondForceCPMiehe(int ii, struct UnitCell cell)
 {
     // create a temporary list to store particle ii and all of its neighbors ID
     int *temporary_nb = allocInt1D(nb[ii] + 1, ii);
     int s = 1;
-    for (int k = 1; k < nneighbors + 1; k++)
+    for (int k = 1; k < cell.nneighbors + 1; k++)
     {
         if (damage_broken[ii][k - 1] > EPS && neighbors[ii][k - 1] != -1)
             temporary_nb[s++] = neighbors[ii][k - 1];
@@ -877,10 +879,10 @@ void computeBondForceCPMiehe(int ii)
     // store state variables of previous time step
     double *xcp_A = allocDouble1D(nb[ii] + 1, 0.0);                   /* accumulated plastic slip */
     double **xcp_A_single = allocDouble2D(nb[ii] + 1, nslipSys, 0.0); /* accumulated plastic slip for individual slip systems */
-    double **xdL = allocDouble2D(nb[ii] + 1, nneighbors, 0.0);        /* temporary bond stretch */
+    double **xdL = allocDouble2D(nb[ii] + 1, cell.nneighbors, 0.0);        /* temporary bond stretch */
     double **xdL_total = allocDouble2D(nb[ii] + 1, 2, 0);
     double **xTdL_total = allocDouble2D(nb[ii] + 1, 2, 0);
-    double **xdLp = allocDouble2D(nb[ii] + 1, nneighbors, 0.0); /* plastic bond stretch */
+    double **xdLp = allocDouble2D(nb[ii] + 1, cell.nneighbors, 0.0); /* plastic bond stretch */
     double **xcp_gy = allocDouble2D(nb[ii] + 1, nslipSys, 0.0); /* yield stress */
 
     // temporary variables
@@ -897,7 +899,7 @@ void computeBondForceCPMiehe(int ii)
     for (int k = 0; k < nb[ii] + 1; k++)
     {
         int i = temporary_nb[k]; // global index for the particle
-        for (int j = 0; j < nneighbors; j++)
+        for (int j = 0; j < cell.nneighbors; j++)
             xdLp[k][j] = dLp[i][j][0];
         xcp_A[k] = cp_A[i][0];
         for (int j = 0; j < nslipSys; j++)
@@ -966,7 +968,7 @@ void computeBondForceCPMiehe(int ii)
 
             /* check if there are any opposite bonds, if no then 1 */
             double opp_flag = 1.0;
-            if (nb[i] == nneighbors)
+            if (nb[i] == cell.nneighbors)
                 opp_flag = 0.5; // there are opposite bond
             else
             {
@@ -986,12 +988,12 @@ void computeBondForceCPMiehe(int ii)
             }
 
             // compute local stress tensor
-            stress_local[0] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csx[i][j];
-            stress_local[1] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csy[i][j];
-            stress_local[2] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csz[i][j] * csz[i][j];
-            stress_local[3] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csz[i][j];
-            stress_local[4] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csz[i][j];
-            stress_local[5] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csy[i][j];
+            stress_local[0] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csx[i][j];
+            stress_local[1] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csy[i][j];
+            stress_local[2] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csz[i][j] * csz[i][j];
+            stress_local[3] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csz[i][j];
+            stress_local[4] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csz[i][j];
+            stress_local[5] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csy[i][j];
         }
 
         // compute trial resolved shear stress (RSS) and yield function, find max value
@@ -1085,7 +1087,7 @@ void computeBondForceCPMiehe(int ii)
 
                     /* check if there are any opposite bonds, if yes then 1 */
                     double opp_flag = 1.0;
-                    if (nb[i] == nneighbors)
+                    if (nb[i] == cell.nneighbors)
                         opp_flag = 0.5; // there are opposite bond
                     else
                     {
@@ -1105,12 +1107,12 @@ void computeBondForceCPMiehe(int ii)
                     }
 
                     // compute local stress tensor
-                    stress_local[0] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csx[i][j];
-                    stress_local[1] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csy[i][j];
-                    stress_local[2] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csz[i][j] * csz[i][j];
-                    stress_local[3] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csz[i][j];
-                    stress_local[4] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csz[i][j];
-                    stress_local[5] += opp_flag / particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csy[i][j];
+                    stress_local[0] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csx[i][j];
+                    stress_local[1] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csy[i][j];
+                    stress_local[2] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csz[i][j] * csz[i][j];
+                    stress_local[3] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csy[i][j] * csz[i][j];
+                    stress_local[4] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csz[i][j];
+                    stress_local[5] += opp_flag / cell.particle_volume * distance_initial[i][j] * Fij * csx[i][j] * csy[i][j];
                 }
 
                 // accumulated plastic slip
@@ -1347,7 +1349,7 @@ void computeBondForceCPMiehe(int ii)
 
     for (int j = 0; j < nb_initial[i]; j++)
     {
-        for (int jj = 0; jj < nneighbors; jj++)
+        for (int jj = 0; jj < cell.nneighbors; jj++)
         {
             if (neighbors[neighbors[i][j]][jj] == i) /* find the opposite particle */
                 dL_ave[i][j] = 0.5 * (dL[i][j] + dL[neighbors[i][j]][jj]);
@@ -1369,7 +1371,7 @@ void computeBondForceCPMiehe(int ii)
     // }
 
     // store the state variables for the particle itself
-    for (int j = 0; j < nneighbors; j++)
+    for (int j = 0; j < cell.nneighbors; j++)
         dLp[i][j][2] = damage_broken[i][j] * xdLp[0][j];
     for (int m = 0; m < nslipSys; m++)
     {
@@ -1396,7 +1398,7 @@ void computeBondForceCPMiehe(int ii)
 }
 
 /* update the damage state after bonds broken */
-void updateCrack()
+void updateCrack(struct UnitCell cell)
 {
     // #pragma omp parallel for
     for (int i = 0; i < nparticle; i++)
@@ -1423,10 +1425,10 @@ void updateCrack()
         if (nb[i] < 1)
         {
             // fix this particle's position, if all bonds are broken
-            fix_index[dim * i] = 0;
-            fix_index[dim * i + 1] = 0;
-            if (dim == 3)
-                fix_index[dim * i + 2] = 0;
+            fix_index[cell.dim * i] = 0;
+            fix_index[cell.dim * i + 1] = 0;
+            if (cell.dim == 3)
+                fix_index[cell.dim * i + 2] = 0;
         }
 
         damage_visual[i] = 1 - damage_visual[i] / nb_initial[i];
@@ -1441,7 +1443,7 @@ int updateBrittleDamage(const char *dataName, int tstep, int nbreak)
     fprintf(fpt, "TIMESTEP ");
     fprintf(fpt, "%d\n", tstep);
 
-    struct bondStrain b_cr[MAXSMALL * MAXSMALL]; // bonds of which the strain reach the critical value
+    struct BondStrain b_cr[MAXSMALL * MAXSMALL]; // bonds of which the strain reach the critical value
 
     // initialization of struct
     for (int i = 0; i < MAXSMALL * MAXSMALL; i++)
@@ -1526,7 +1528,7 @@ int updateBrittleDamage(const char *dataName, int tstep, int nbreak)
 }
 
 /* update the damage variables for elasto-plastic materials, using CDM, average bond damage, nonlocal */
-int updateDuctileDamageBwiseNonlocal(const char *dataName, int tstep)
+int updateDuctileDamageBwiseNonlocal(const char *dataName, int tstep, struct UnitCell cell)
 {
     // unlike brittle materials, we donnot limit the broken particle number
     FILE *fpt;
@@ -1550,8 +1552,8 @@ int updateDuctileDamageBwiseNonlocal(const char *dataName, int tstep)
         if (damage_f > 0.0)
             DdotLocal = J2_dlambda[i] * (1.0 + damagec_A * J2_triaxiality[i]);
 
-        double Ddot = DdotLocal * particle_volume;
-        double A = particle_volume;
+        double Ddot = DdotLocal * cell.particle_volume;
+        double A = cell.particle_volume;
         for (int j = 0; j < nb_initial[i]; j++)
         {
             DdotLocal = 0;
@@ -1560,8 +1562,8 @@ int updateDuctileDamageBwiseNonlocal(const char *dataName, int tstep)
                 DdotLocal = J2_dlambda[neighbors[i][j]] * (1.0 + damagec_A * J2_triaxiality[neighbors[i][j]]);
             // Ddot += damage_broken[i][j] * DdotLocal * DAM_PHI(distance_initial[i][j]) * particle_volume;
             // A += damage_broken[i][j] * DAM_PHI(distance_initial[i][j]) * particle_volume;
-            Ddot += DdotLocal * DAM_PHI(distance_initial[i][j]) * particle_volume;
-            A += DAM_PHI(distance_initial[i][j]) * particle_volume;
+            Ddot += DdotLocal * DAM_PHI(distance_initial[i][j]) * cell.particle_volume;
+            A += DAM_PHI(distance_initial[i][j]) * cell.particle_volume;
         }
         if (Ddot > 0.0)
             damage_nonlocal[i][0] += 1.0 / A * Ddot;
@@ -1604,7 +1606,7 @@ int updateDuctileDamageBwiseNonlocal(const char *dataName, int tstep)
 }
 
 /* update the damage variables for elasto-plastic materials, using CDM, average bond damage */
-int updateDuctileDamageBwiseLocal(const char *dataName, int tstep)
+int updateDuctileDamageBwiseLocal(const char *dataName, int tstep, struct UnitCell cell)
 {
     // unlike brittle materials, we donnot limit the broken particle number
     FILE *fpt;
@@ -1660,7 +1662,7 @@ int updateDuctileDamageBwiseLocal(const char *dataName, int tstep)
                 damage_D[i][j][0] = 1.0;
                 damage_broken[i][j] = 0.0;
 
-                for (int jj = 0; jj < nneighbors; jj++)
+                for (int jj = 0; jj < cell.nneighbors; jj++)
                 {
                     if (neighbors[neighbors[i][j]][jj] == i) /* find the opposite particle */
                     {
@@ -1695,7 +1697,7 @@ int updateDuctileDamageBwiseLocal(const char *dataName, int tstep)
 }
 
 /* update the damage variables for elasto-plastic materials, using damage accumulation laws, fix the broken particle */
-int updateDuctileDamagePwiseLocal(const char *dataName, int tstep)
+int updateDuctileDamagePwiseLocal(const char *dataName, int tstep, struct UnitCell cell)
 {
     // unlike brittle materials, we donnot limit the broken particle number
     FILE *fpt;
@@ -1722,7 +1724,7 @@ int updateDuctileDamagePwiseLocal(const char *dataName, int tstep)
                 // damage_D[i][j][0] = damage_threshold;
                 // damage_D[i][j][0] = 1.0;
 
-                for (int jj = 0; jj < nneighbors; jj++)
+                for (int jj = 0; jj < cell.nneighbors; jj++)
                 {
                     if (neighbors[neighbors[i][j]][jj] == i) /* find the opposite particle */
                     {
@@ -1754,7 +1756,7 @@ int updateDuctileDamagePwiseLocal(const char *dataName, int tstep)
 
 /* update the damage variables for elasto-plastic materials, using damage accumulation laws, fix the broken particle */
 /* nonlocal */
-int updateDuctileDamagePwiseNonlocal(const char *dataName, int tstep)
+int updateDuctileDamagePwiseNonlocal(const char *dataName, int tstep, struct UnitCell cell)
 {
     // unlike brittle materials, we donnot limit the broken particle number
     FILE *fpt;
@@ -1817,8 +1819,8 @@ int updateDuctileDamagePwiseNonlocal(const char *dataName, int tstep)
                 double damage_f = (1.0 + damagec_A * J2_triaxiality[j]);
                 if (damage_f > 0.0)
                     DdotLocal = J2_dlambda[j] * (1.0 + damagec_A * J2_triaxiality[j]);
-                Ddot += DdotLocal * DAM_PHI(dis) * particle_volume;
-                A += DAM_PHI(dis) * particle_volume;
+                Ddot += DdotLocal * DAM_PHI(dis) * cell.particle_volume;
+                A += DAM_PHI(dis) * cell.particle_volume;
             }
         }
         if (Ddot > 0.0)
@@ -1861,7 +1863,7 @@ int updateDuctileDamagePwiseNonlocal(const char *dataName, int tstep)
     return k;
 }
 
-void computeCab()
+void computeCab(struct UnitCell cell)
 {
     /* compute the -dRSF/dgama */
 #pragma omp parallel for
@@ -1890,7 +1892,7 @@ void computeCab()
 
                     /* check if there are any opposite bonds, if yes then 1 */
                     double opp_flag = 1.0;
-                    if (nb[i] == nneighbors)
+                    if (nb[i] == cell.nneighbors)
                         opp_flag = 0.5; // there are opposite bond
                     else
                     {
@@ -1909,7 +1911,7 @@ void computeCab()
                         }
                     }
 
-                    cp_Cab[i][m * nslipSys + n] += -opp_flag / particle_volume * distance[i][j] * dFdgama * (csx[i][j] * csx[i][j] * schmid_tensor[m][0] + csy[i][j] * csy[i][j] * schmid_tensor[m][1] + csz[i][j] * csz[i][j] * schmid_tensor[m][2] + csy[i][j] * csz[i][j] * schmid_tensor[m][3] + csx[i][j] * csz[i][j] * schmid_tensor[m][4] + csx[i][j] * csy[i][j] * schmid_tensor[m][5]);
+                    cp_Cab[i][m * nslipSys + n] += -opp_flag / cell.particle_volume * distance[i][j] * dFdgama * (csx[i][j] * csx[i][j] * schmid_tensor[m][0] + csy[i][j] * csy[i][j] * schmid_tensor[m][1] + csz[i][j] * csz[i][j] * schmid_tensor[m][2] + csy[i][j] * csz[i][j] * schmid_tensor[m][3] + csx[i][j] * csz[i][j] * schmid_tensor[m][4] + csx[i][j] * csy[i][j] * schmid_tensor[m][5]);
                 }
             }
         }

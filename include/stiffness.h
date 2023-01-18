@@ -2,9 +2,13 @@
 #ifndef STIFFNESS_H
 #define STIFFNESS_H
 
-void calcKnTv(int ntype);
-void updateRR();
-void calcStiffness2DFiniteDifference(int plmode);
-void calcStiffness3DFiniteDifference(int plmode);
+#include "lpm.h"
+
+struct UnitCell;
+
+void calcKnTv(int ntype, struct UnitCell cell);
+void updateRR(struct UnitCell cell);
+void calcStiffness2DFiniteDifference(int plmode, struct UnitCell cell);
+void calcStiffness3DFiniteDifference(int plmode, struct UnitCell cell);
 
 #endif

@@ -6,7 +6,7 @@
 #include "lpm.h"
 
 /* search the neighbor for the particle system, without a crack */
-void searchNormalNeighbor()
+void searchNormalNeighbor(struct UnitCell cell)
 {
 #pragma omp parallel for
     for (int i = 0; i < nparticle; i++)
@@ -17,7 +17,7 @@ void searchNormalNeighbor()
         {
             double dis = sqrt(pow((xyz[j][0] - xyz[i][0]), 2) + pow((xyz[j][1] - xyz[i][1]), 2) + pow((xyz[j][2] - xyz[i][2]), 2));
 
-            if ((dis < 1.01 * neighbor1_cutoff) && (j != i)) /* The first nearest neighbors */
+            if ((dis < 1.01 * cell.neighbor1_cutoff) && (j != i)) /* The first nearest neighbors */
             {
                 neighbors1[i][index1++] = j;
                 csx_initial[i][index3] = (xyz[i][0] - xyz[j][0]) / dis;
@@ -28,7 +28,7 @@ void searchNormalNeighbor()
                 nsign[i][index3] = 0;
                 neighbors[i][index3++] = j;
             }
-            else if ((dis > 1.01 * neighbor1_cutoff) && (dis < 1.01 * neighbor2_cutoff)) /* The second nearest neighbors */
+            else if ((dis > 1.01 * cell.neighbor1_cutoff) && (dis < 1.01 * cell.neighbor2_cutoff)) /* The second nearest neighbors */
             {
                 neighbors2[i][index2++] = j;
                 csx_initial[i][index3] = (xyz[i][0] - xyz[j][0]) / dis;
@@ -46,11 +46,11 @@ void searchNormalNeighbor()
 }
 
 /* search the AFEM neighbors, only once before the simulation starts */
-int searchAFEMNeighbor()
+int searchAFEMNeighbor(struct UnitCell cell)
 {
-    int* temp = allocInt1D(nneighbors_AFEM + 1, -1);
-    int** collection = allocInt2D(nparticle + 1, nneighbors * nneighbors, -1);
-    int** collectionInitial = allocInt2D(nparticle + 1, nneighbors * nneighbors, -1);
+    int* temp = allocInt1D(cell.nneighbors_AFEM + 1, -1);
+    int** collection = allocInt2D(nparticle + 1, cell.nneighbors * cell.nneighbors, -1);
+    int** collectionInitial = allocInt2D(nparticle + 1, cell.nneighbors * cell.nneighbors, -1);
 
 #pragma omp parallel for
     for (int i = 0; i < nparticle; i++) /* Collecting the afem neighbors for each particle */
@@ -60,7 +60,7 @@ int searchAFEMNeighbor()
         {
             if (nsign[i][j] == 0)
             {
-                int nb2 = countNEqual(neighbors1[neighbors1[i][index3]], nneighbors1, -1);
+                int nb2 = countNEqual(neighbors1[neighbors1[i][index3]], cell.nneighbors1, -1);
                 collection[i][index2++] = neighbors1[i][index3];
                 for (int k = 0; k < nb2; k++)
                 {
@@ -70,7 +70,7 @@ int searchAFEMNeighbor()
             }
             else if (nsign[i][j] == 1)
             {
-                int nb2 = countNEqual(neighbors2[neighbors2[i][index4]], nneighbors2, -1);
+                int nb2 = countNEqual(neighbors2[neighbors2[i][index4]], cell.nneighbors2, -1);
                 collection[i][index2++] = neighbors2[i][index4];
                 for (int m = 0; m < nb2; m++)
                 {
@@ -86,7 +86,7 @@ int searchAFEMNeighbor()
     {
         int nb1 = 1;
         conn[i][0] = collection[i][0];
-        int nb2 = countNEqual(collection[i], nneighbors * nneighbors, -1);
+        int nb2 = countNEqual(collection[i], cell.nneighbors * cell.nneighbors, -1);
         for (int j = 1; j < nb2; j++)
         {
             for (int k = 0; k < nb1; k++)
@@ -102,7 +102,7 @@ int searchAFEMNeighbor()
     /* Sorting the conn matrix */
     for (int i = 0; i < nparticle; i++)
     {
-        int nb1 = countNEqual(conn[i], nneighbors_AFEM + 1, -1);
+        int nb1 = countNEqual(conn[i], cell.nneighbors_AFEM + 1, -1);
         nb_conn[i] = nb1;
         for (int j = 0; j < nb1; j++)
             temp[j] = conn[i][j];
@@ -123,14 +123,14 @@ int searchAFEMNeighbor()
         /* Numbers of conn larger than (or equal to) its own index for each particle */
         K_pointer[i][0] = index1;
         /* Start index for each particle in the global stiffness matrix */
-        if (dim == 2)
-            K_pointer[i + 1][1] = K_pointer[i][1] + dim * dim * index1 - 1;
-        else if (dim == 3)
-            K_pointer[i + 1][1] = K_pointer[i][1] + dim * dim * index1 - 3;
+        if (cell.dim == 2)
+            K_pointer[i + 1][1] = K_pointer[i][1] + cell.dim * cell.dim * index1 - 1;
+        else if (cell.dim == 3)
+            K_pointer[i + 1][1] = K_pointer[i][1] + cell.dim * cell.dim * index1 - 3;
     }
 
     JK = allocInt1D(K_pointer[nparticle][1], -1);
-    IK = allocInt1D(dim * nparticle + 1, -1);
+    IK = allocInt1D(cell.dim * nparticle + 1, -1);
     K_global = allocDouble1D(K_pointer[nparticle][1], -1);
 
     free(temp);

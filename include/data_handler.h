@@ -2,6 +2,9 @@
 #ifndef DATA_HANDLER_H
 #define DATA_HANDLER_H
 
+#include "lpm.h"
+struct UnitCell;
+
 //void readLammps(const char *dataName, int skip);
 void writeDump(const char *dataName, int step, char flag);
 void writeRSS(const char *dataName, int step);
@@ -13,7 +16,7 @@ void writeReaction(const char *dataName, char c, int t1, int tstep);
 void writeStress(const char *dataName, int t1, int tstep);
 void writeStrain(const char *dataName, int t1, int tstep);
 void writeBondstretch(const char *dataName, int step);
-void writeBondforce(const char *dataName, int step);
+void writeBondforce(const char *dataName, int step, struct UnitCell cell);
 void writeJact(const char *dataName, int step);
 void writeInternalForce(const char *dataName, int step);
 void writeDamage(const char *dataName, int step);

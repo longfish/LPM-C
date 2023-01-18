@@ -17,8 +17,8 @@
 
 /* definition of global variables */
 /* int */
-int ntype, particles_first_row, nparticle, rows, layers, nneighbors, nneighbors1, nneighbors2, dim;
-int lattice, nneighbors_AFEM, nneighbors_AFEM1, nneighbors_AFEM2, plmode, eulerflag, nslip_face;
+int nparticle, dim;
+int lattice, plmode, eulerflag, nslip_face;
 int max_nslip_vector, nslipSys, nbreak;
 
 int *IK, *JK, *type, *dispBC_index, *fix_index, *nslip_vector, *lacknblist, pbc[NDIM], *pl_flag;
@@ -27,7 +27,7 @@ int **neighbors, **neighbors1, **neighbors2, **neighbors_AFEM;
 int **K_pointer, **conn, **nsign, **cp_Jact;
 
 /* double precision float */
-double radius, hx, hy, hz, neighbor1_cutoff, neighbor2_cutoff, angle1, angle2, angle3, particle_volume;
+double hx, hy, hz, angle1, angle2, angle3;
 double R_matrix[NDIM * NDIM], box[2 * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
 double box_x, box_y, box_z, cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
 double damage_threshold, damageb_A, damagec_A, critical_bstrain;
@@ -73,16 +73,9 @@ int main(int argc, char *argv[])
     // body-centered cubic with 1 types of slip systems -> 4
     // body-centered cubic with 2 types of slip systems -> 5
     // body-centered cubic with 3 types of slip systems -> 6
-    lattice = 2;
-
-    // dimensionality, int
-    if (lattice < 2)
-        dim = 2;
-    else
-        dim = 3;
-
-    // particle radius, double
-    radius = 0.2499999944120646;
+    int lattice = 2;
+    double radius = 0.2499999944120646;
+    struct UnitCell cell = createUnitCell(lattice, radius); /*lattice type is 2, simple cubic*/
 
     // periodic boundary conditions
     // 1 with periodicity, 0 without periodicity
@@ -121,7 +114,7 @@ int main(int argc, char *argv[])
     box_x = box[1] - box[0]; // box size
     box_y = box[3] - box[2];
     box_z = box[5] - box[4];
-    createCuboid();
+    createCuboid(cell);
 
     // (if applicable) read particle information in lammps format
     // char tempFile[] = "Fe_supercell.lmp";
@@ -155,32 +148,26 @@ int main(int argc, char *argv[])
     // createCylinderz(pc, 9.0);  // cylinder test specimen
     // removeRingz(pc, 9.0, 4.0); // remove a ring
 
-    initMatrices();
+    initMatrices(cell);
     copyDouble2D(xyz_initial, xyz, nparticle, NDIM);
 
     printf("\nParticle number is %d\n", nparticle);
 
     // search neighbor
-    searchNormalNeighbor();
-    int len_K_global = searchAFEMNeighbor();
+    searchNormalNeighbor(cell);
+    int len_K_global = searchAFEMNeighbor(cell);
 
     //printf("Neighbor-searching finished, stiffness matrix size is %d\n", len_K_global);
 
     // assign types for particles located in different rectangular regions
     // xlo, xhi, ylo, yhi, zlo, zhi, type
-    ntype = 0;
+    int ntype = 0;
     type = allocInt1D(nparticle, ntype++); // set particle type as 0 in default
-
-    // setTypeRect(-100.0, 100.0, -100.0, 100.0, 10 - 1.2 * radius, 100.0, ntype++);               // top layer, type 1,
-    // setTypeRect(-100.0, 0.2 * radius, -100.0, 100.0, 10 - 1.2 * radius, 100.0, ntype++);        // x line, type 2
-    // setTypeRect(-100.0, 100.0, -100.0, 1.2 * radius, 10 - 1.2 * radius, 100.0, ntype++);        // y line, type 3
-    // setTypeRect(-100.0, 0.2 * radius, -100.0, 1.2 * radius, 10 - 1.2 * radius, 100.0, ntype++); // top fix point, type 4
-    // setTypeRect(-100.0, 100.0, -100.0, 100.0, -100.0, 1.2 * radius, ntype++);                   // lower layer, type 5
 
     setTypeRect(-100.0, 100.0, -100.0, 100.0, 10 - 1.2 * radius, 100.0, ntype++); // top layer, type 1,
     setTypeRect(-100.0, 100.0, -100.0, 100.0, -100.0, 1.2 * radius, ntype++);     // lower layer, type 2
 
-    setTypeFullNeighbor(ntype++); // set the particle type as 3 if the neighbor list is full
+    setTypeFullNeighbor(ntype++, cell); // set the particle type as 3 if the neighbor list is full
 
     // material elastic parameters setting, MPa
     double C11, C12, C44;
@@ -281,8 +268,8 @@ int main(int argc, char *argv[])
 
     int nbd = 0, nbf = 0;     // total number of disp or force boundary conditions
     char cal_method[] = "cg"; // calculation method, pardiso or conjugate gradient
-    struct dispBCPara dBP[MAXLINE][MAXSMALL] = {0};
-    struct forceBCPara fBP[MAXLINE][MAXSMALL] = {0};
+    struct DispBCs dBP[MAXLINE][MAXSMALL] = {0};
+    struct ForceBCs fBP[MAXLINE][MAXSMALL] = {0};
     int load_indicator[MAXLINE] = {0}; // tension (1) or compressive (-1) loading condition for uniaxial loading
 
     // displace boundary conditions
@@ -311,13 +298,13 @@ int main(int argc, char *argv[])
 
     /************************** Simulation begins *************************/
     // compute necessary into before loading starts
-    calcKnTv(ntype);
+    calcKnTv(ntype, cell);
     computedL();
 
     // crystal lattice settings
-    slipSysDefine3D(); // define slip systems for cubic systems
+    slipSysDefine3D(cell); // define slip systems for cubic systems
     if (lattice == 3 || lattice == 4)
-        computeCab();
+        computeCab(cell);
 
     // output files
     if (outdisp_flag)
@@ -360,28 +347,28 @@ int main(int argc, char *argv[])
 
         printf("######################################## Loading step %d ######################################\n", i + 1);
         copyDouble2D(xyz_temp, xyz, nparticle, NDIM);
-        copyDouble2D(F_temp, F, nparticle, nneighbors);
+        copyDouble2D(F_temp, F, nparticle, cell.nneighbors);
         copyDouble1D(Pex_temp, Pex, dim * nparticle);
 
         omp_set_num_threads(nt_force);
         // compute the elastic stiffness matrix
         if (dim == 2)
-            calcStiffness2DFiniteDifference(6);
+            calcStiffness2DFiniteDifference(6, cell);
         else if (dim == 3)
-            calcStiffness3DFiniteDifference(6);
+            calcStiffness3DFiniteDifference(6, cell);
 
         double time_t1 = omp_get_wtime();
         printf("Stiffness matrix calculation costs %f seconds\n", time_t1 - startrun);
 
     label_wei:
-        setDispBC(nbd, dBP[i]);  // update displacement BC
-        setForceBC(nbf, fBP[i]); // update force BC
+        setDispBC(nbd, dBP[i], cell);  // update displacement BC
+        setForceBC(nbf, fBP[i], cell); // update force BC
 
-        computeBondForceGeneral(plmode, load_indicator[i]); // incremental updating
+        computeBondForceGeneral(plmode, load_indicator[i], cell); // incremental updating
         omp_set_num_threads(nt);
 
     label_broken_bond:
-        updateRR(); // residual force vector and reaction force (RR)
+        updateRR(cell); // residual force vector and reaction force (RR)
 
         // compute the Euclidean norm (L2 norm)
         double norm_residual = cblas_dnrm2(dim * nparticle, residual, 1);
@@ -400,33 +387,33 @@ int main(int argc, char *argv[])
         {
             printf("Step-%d, iteration-%d: ", i + 1, ni);
 
-            switchStateV(0); // copy the last converged state variable [1] into current one [0]
+            switchStateV(0, cell); // copy the last converged state variable [1] into current one [0]
 
             // time_t1 = omp_get_wtime();
             // compute the stiffness matrix, then modify it for displacement boundary condition
             if (dim == 2)
             {
                 // calcStiffness2DFiniteDifference(6);
-                setDispBC_stiffnessUpdate2D();
+                setDispBC_stiffnessUpdate2D(cell);
             }
             else if (dim == 3)
             {
                 // calcStiffness3DFiniteDifference(6);
-                setDispBC_stiffnessUpdate3D();
+                setDispBC_stiffnessUpdate3D(cell);
             }
             // time_t2 = omp_get_wtime();
             // printf("Modify stiffness costs %f seconds\n", time_t2 - time_t1);
 
             // solve for the incremental displacement
             if (strcmp(cal_method, "pardiso") == 0)
-                solverPARDISO();
+                solverPARDISO(cell);
             else if (strcmp(cal_method, "cg") == 0)
-                solverCG();
+                solverCG(cell);
             // time_t1 = omp_get_wtime();
             // printf("Solve the linear system costs %f seconds\n", time_t1 - time_t2);
 
             omp_set_num_threads(nt_force);
-            computeBondForceGeneral(4, load_indicator[i]); // update the bond force
+            computeBondForceGeneral(4, load_indicator[i], cell); // update the bond force
             omp_set_num_threads(nt);
 
             // time_t2 = omp_get_wtime();
@@ -434,16 +421,16 @@ int main(int argc, char *argv[])
 
             // writeDlambda(dlambdaFile, 9039, 9047, i + 1, ni);
 
-            updateRR(); /* update the RHS risidual force vector */
+            updateRR(cell); /* update the RHS risidual force vector */
             norm_residual = cblas_dnrm2(dim * nparticle, residual, 1);
             printf("Norm of residual is %.3e, residual ratio is %.3e\n", norm_residual, norm_residual / tol_multiplier);
         }
-        computeStrain();
+        computeStrain(cell);
 
         /* accumulate damage, and break bonds when damage reaches critical values */
-        int broken_bond = updateDamageGeneral(bondFile, i + 1, plmode);
-        updateCrack();
-        switchStateV(1); // copy current state variable [0] into last converged one [1]
+        int broken_bond = updateDamageGeneral(bondFile, i + 1, plmode, cell);
+        updateCrack(cell);
+        switchStateV(1, cell); // copy current state variable [0] into last converged one [1]
 
         printf("Loading step %d has finished in %d iterations\n\nData output ...\n", i + 1, ni);
 
@@ -483,9 +470,9 @@ int main(int argc, char *argv[])
             omp_set_num_threads(nt_force);
             // recompute stiffness matrix
             if (dim == 2)
-                calcStiffness2DFiniteDifference(6);
+                calcStiffness2DFiniteDifference(6, cell);
             else if (dim == 3)
-                calcStiffness3DFiniteDifference(6);
+                calcStiffness3DFiniteDifference(6, cell);
             omp_set_num_threads(nt);
             time_t1 = omp_get_wtime();
             printf("\nStiffness matrix calculation costs %f seconds\n", time_t1 - startrun);
@@ -497,9 +484,9 @@ int main(int argc, char *argv[])
         printf("Time costed for step %d: %f seconds\n\n", i + 1, finishrun - startrun);
     }
 
-    computeBondStretch();
-    computeBondForce();
-    writeBondforce(bforceFile, 0);
+    computeBondStretch(cell);
+    computeBondForce(cell);
+    writeBondforce(bforceFile, 0, cell);
     writeBondstretch(stretchFile, 0);
     writeNeighbor(neighborFile);
 

@@ -5,11 +5,11 @@
 #include "lpm.h"
 
 /* organize the bond force in order */
-void computeBondForce()
+void computeBondForce(struct UnitCell cell)
 {
     for (int i = 0; i < nparticle; i++)
     {
-        for (int k = 0; k < nneighbors; k++)
+        for (int k = 0; k < cell.nneighbors; k++)
         {
             for (int j = 0; j < nb_initial[i]; j++)
             {
@@ -27,11 +27,11 @@ void computeBondForce()
     }
 }
 
-void computeBondStretch()
+void computeBondStretch(struct UnitCell cell)
 {
     for (int i = 0; i < nparticle; i++)
     {
-        for (int k = 0; k < nneighbors; k++)
+        for (int k = 0; k < cell.nneighbors; k++)
         {
             for (int j = 0; j < nb_initial[i]; j++)
             {
@@ -50,7 +50,7 @@ void computeBondStretch()
 }
 
 /* compute the stress tensor (modified-2) */
-void computeStress()
+void computeStress(struct UnitCell cell)
 {
 #pragma omp parallel for
     for (unsigned i = 0; i < (unsigned)nparticle; i++)
@@ -70,7 +70,7 @@ void computeStress()
 
             /* check if there are any opposite bonds, if yes then 1 */
             double opp_flag = 1.0;
-            if (nb[i] == nneighbors)
+            if (nb[i] == cell.nneighbors)
                 opp_flag = 0.5; // there are opposite bond
             else
             {
@@ -90,12 +90,12 @@ void computeStress()
             }
 
             // compute local stress tensor
-            stress_tensor[i][0] += opp_flag / particle_volume * distance_initial[i][j] * F[i][j] * csx[i][j] * csx[i][j];
-            stress_tensor[i][1] += opp_flag / particle_volume * distance_initial[i][j] * F[i][j] * csy[i][j] * csy[i][j];
-            stress_tensor[i][2] += opp_flag / particle_volume * distance_initial[i][j] * F[i][j] * csz[i][j] * csz[i][j];
-            stress_tensor[i][3] += opp_flag / particle_volume * distance_initial[i][j] * F[i][j] * csy[i][j] * csz[i][j];
-            stress_tensor[i][4] += opp_flag / particle_volume * distance_initial[i][j] * F[i][j] * csx[i][j] * csz[i][j];
-            stress_tensor[i][5] += opp_flag / particle_volume * distance_initial[i][j] * F[i][j] * csx[i][j] * csy[i][j];
+            stress_tensor[i][0] += opp_flag / cell.particle_volume * distance_initial[i][j] * F[i][j] * csx[i][j] * csx[i][j];
+            stress_tensor[i][1] += opp_flag / cell.particle_volume * distance_initial[i][j] * F[i][j] * csy[i][j] * csy[i][j];
+            stress_tensor[i][2] += opp_flag / cell.particle_volume * distance_initial[i][j] * F[i][j] * csz[i][j] * csz[i][j];
+            stress_tensor[i][3] += opp_flag / cell.particle_volume * distance_initial[i][j] * F[i][j] * csy[i][j] * csz[i][j];
+            stress_tensor[i][4] += opp_flag / cell.particle_volume * distance_initial[i][j] * F[i][j] * csx[i][j] * csz[i][j];
+            stress_tensor[i][5] += opp_flag / cell.particle_volume * distance_initial[i][j] * F[i][j] * csx[i][j] * csy[i][j];
         }
 
         J2_stresseq[i] = 0.0;
@@ -124,11 +124,11 @@ void computeStress()
     }
 }
 
-void computeStrain()
+void computeStrain(struct UnitCell cell)
 {
     /* compute the strain tensor using weighted least squre */
-    double *matrix_A = allocDouble1D(3 * (dim - 1) * 3 * (dim - 1), 0);
-    double *rhs_b = allocDouble1D(3 * (dim - 1), 0);
+    double *matrix_A = allocDouble1D(3 * (cell.dim - 1) * 3 * (cell.dim - 1), 0);
+    double *rhs_b = allocDouble1D(3 * (cell.dim - 1), 0);
 
     double w1 = 0.1, w2 = 0.9; /* weights for the weighted least square method */
 
@@ -143,16 +143,16 @@ void computeStrain()
             /* first nearst neighbors */
             if (nsign[i][j] == 0)
             {
-                for (int k = 0; k < dim; k++)
-                    for (int n = 0; n < dim; n++)
-                        for (int m = 0; m < dim; m++)
-                            for (int l = 0; l < dim; l++)
+                for (int k = 0; k < cell.dim; k++)
+                    for (int n = 0; n < cell.dim; n++)
+                        for (int m = 0; m < cell.dim; m++)
+                            for (int l = 0; l < cell.dim; l++)
                                 r4t[k][n][m][l] += w1 * (xyz_initial[neighbors[i][j]][k] - xyz_initial[i][k]) / distance_initial[i][j] *
                                                    (xyz_initial[neighbors[i][j]][n] - xyz_initial[i][n]) / distance_initial[i][j] *
                                                    (xyz_initial[neighbors[i][j]][m] - xyz_initial[i][m]) / distance_initial[i][j] *
                                                    (xyz_initial[neighbors[i][j]][l] - xyz_initial[i][l]) / distance_initial[i][j];
-                for (int k = 0; k < dim; k++)
-                    for (int n = 0; n < dim; n++)
+                for (int k = 0; k < cell.dim; k++)
+                    for (int n = 0; n < cell.dim; n++)
                         r2t[k][n] += w1 * dL[i][j] / distance_initial[i][j] *
                                      (xyz_initial[neighbors[i][j]][k] - xyz_initial[i][k]) / distance_initial[i][j] *
                                      (xyz_initial[neighbors[i][j]][n] - xyz_initial[i][n]) / distance_initial[i][j];
@@ -160,31 +160,31 @@ void computeStrain()
             /* second nearst neighbors */
             else if (nsign[i][j] == 1)
             {
-                for (int k = 0; k < dim; k++)
-                    for (int n = 0; n < dim; n++)
-                        for (int m = 0; m < dim; m++)
-                            for (int l = 0; l < dim; l++)
+                for (int k = 0; k < cell.dim; k++)
+                    for (int n = 0; n < cell.dim; n++)
+                        for (int m = 0; m < cell.dim; m++)
+                            for (int l = 0; l < cell.dim; l++)
                                 r4t[k][n][m][l] += w2 * (xyz_initial[neighbors[i][j]][k] - xyz_initial[i][k]) / distance_initial[i][j] *
                                                    (xyz_initial[neighbors[i][j]][n] - xyz_initial[i][n]) / distance_initial[i][j] *
                                                    (xyz_initial[neighbors[i][j]][m] - xyz_initial[i][m]) / distance_initial[i][j] *
                                                    (xyz_initial[neighbors[i][j]][l] - xyz_initial[i][l]) / distance_initial[i][j];
-                for (int k = 0; k < dim; k++)
-                    for (int n = 0; n < dim; n++)
+                for (int k = 0; k < cell.dim; k++)
+                    for (int n = 0; n < cell.dim; n++)
                         r2t[k][n] += w2 * dL[i][j] / distance_initial[i][j] *
                                      (xyz_initial[neighbors[i][j]][k] - xyz_initial[i][k]) / distance_initial[i][j] *
                                      (xyz_initial[neighbors[i][j]][n] - xyz_initial[i][n]) / distance_initial[i][j];
             }
         }
 
-        memset(matrix_A, 0, 3 * (dim - 1) * 3 * (dim - 1) * sizeof(double));
-        memset(rhs_b, 0, 3 * (dim - 1) * sizeof(double));
+        memset(matrix_A, 0, 3 * (cell.dim - 1) * 3 * (cell.dim - 1) * sizeof(double));
+        memset(rhs_b, 0, 3 * (cell.dim - 1) * sizeof(double));
 
         /* construct the linear system */
         int ii = 0;
-        for (int j = 0; j < dim; j++)
-            for (int k = 0; k < dim; k++)
-                for (int m = 0; m < dim; m++)
-                    for (int l = 0; l < dim; l++)
+        for (int j = 0; j < cell.dim; j++)
+            for (int k = 0; k < cell.dim; k++)
+                for (int m = 0; m < cell.dim; m++)
+                    for (int l = 0; l < cell.dim; l++)
                     {
                         if (m <= l && j <= k)
                         {
@@ -194,8 +194,8 @@ void computeStrain()
                     }
 
         ii = 0;
-        for (int j = 0; j < dim; j++)
-            for (int k = 0; k < dim; k++)
+        for (int j = 0; j < cell.dim; j++)
+            for (int k = 0; k < cell.dim; k++)
             {
                 if (j <= k)
                 {
@@ -205,8 +205,8 @@ void computeStrain()
             }
 
         /* compute the strain tensor e = rhs_b/matrix_A */
-        MKL_INT n = 3 * (dim - 1),
-                nrhs = 1, lda = 3 * (dim - 1), ldb = 1; /* ldb is 1 for ROW MAJOR layout */
+        MKL_INT n = 3 * (cell.dim - 1),
+                nrhs = 1, lda = 3 * (cell.dim - 1), ldb = 1; /* ldb is 1 for ROW MAJOR layout */
         MKL_INT ipiv[2 * 3];                            /* max number of strain components is 6 */
 
         int info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, matrix_A, lda, ipiv, rhs_b, ldb);
@@ -222,18 +222,18 @@ void computeStrain()
             continue;
         if (info > 0 && i != 0)
         {
-            for (int k = 0; k < 3 * (dim - 1); k++)
+            for (int k = 0; k < 3 * (cell.dim - 1); k++)
                 strain_tensor[i][k] = strain_tensor[i - 1][k];
         }
 
         /* copy into real strain tensor array (there are 6 components in it) */
-        if (dim == 2)
+        if (cell.dim == 2)
         {
             strain_tensor[i][0] = rhs_b[0]; // e11
             strain_tensor[i][5] = rhs_b[1]; // e12
             strain_tensor[i][1] = rhs_b[2]; // e22
         }
-        else if (dim == 3)
+        else if (cell.dim == 3)
         {
             strain_tensor[i][0] = rhs_b[0]; // e11
             strain_tensor[i][5] = rhs_b[1]; // e12
@@ -348,11 +348,11 @@ void setTypeCircle(double x, double y, double r, int t)
 }
 
 /* assign particle type as k if the neighbor list is full */
-void setTypeFullNeighbor(int k)
+void setTypeFullNeighbor(int k, struct UnitCell cell)
 {
     for (int i = 0; i < nparticle; i++)
     {
-        if (nb_initial[i] == nneighbors)
+        if (nb_initial[i] == cell.nneighbors)
             type[i] = k;
     }
 }

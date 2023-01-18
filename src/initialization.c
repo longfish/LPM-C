@@ -3,9 +3,92 @@
 
 #include "lpm.h"
 
-void createCuboid()
+struct UnitCell createUnitCell(int lattice, double radius)
 {
-    int i, j, k, n, nparticle_t;
+    struct UnitCell cell;
+    cell.lattice = lattice;
+
+    if (lattice == 0) /* 2D square lattice (double layer neighbor) */
+    {
+        cell.dim = 2;
+        cell.nneighbors = 8;
+        cell.nneighbors1 = 4;
+        cell.nneighbors2 = 4;
+        cell.radius = radius;
+        cell.neighbor1_cutoff = 2.0 * radius;
+        cell.neighbor2_cutoff = 2.0 * sqrt(2.0) * radius;
+        cell.nneighbors_AFEM = 16;
+        cell.nneighbors_AFEM1 = 12;
+        cell.nneighbors_AFEM2 = 12;
+        cell.particle_volume = 4 * pow(radius, 2) * box_z; /* volume of unit cell */
+    }
+
+    if (lattice == 1) /* 2D hexagon lattice (double layer neighbor) */
+    {
+        cell.dim = 2;
+        cell.nneighbors = 12;
+        cell.nneighbors1 = 6;
+        cell.nneighbors2 = 6;
+        cell.nneighbors_AFEM = 30;
+        cell.nneighbors_AFEM1 = 18;
+        cell.nneighbors_AFEM2 = 18;
+        cell.radius = radius;
+        cell.neighbor1_cutoff = 2.0 * radius;
+        cell.neighbor2_cutoff = 2.0 * sqrt(3.0) * radius;
+        cell.particle_volume = 2 * sqrt(3) * pow(radius, 2) * box_z; /* volume of unit cell */
+    }
+
+    if (lattice == 2) /* simple cubic */
+    {
+        cell.dim = 3;
+        cell.nneighbors = 18;
+        cell.nneighbors1 = 6;
+        cell.nneighbors2 = 12;
+        cell.radius = radius;
+        cell.neighbor1_cutoff = 2.0 * radius;
+        cell.neighbor2_cutoff = 2.0 * sqrt(2.0) * radius;
+        cell.nneighbors_AFEM = 60;
+        cell.nneighbors_AFEM1 = 24;
+        cell.nneighbors_AFEM2 = 54;
+        cell.particle_volume = pow(2 * radius, 3); /* volume of unit cell */
+    }
+
+    if (lattice == 3) /* face centered cubic  */
+    {
+        cell.dim = 3;
+        cell.nneighbors = 18;
+        cell.nneighbors1 = 12;
+        cell.nneighbors2 = 6;
+        cell.radius = radius;
+        cell.neighbor1_cutoff = 2.0 * radius;
+        cell.neighbor2_cutoff = 2.0 * sqrt(2.0) * radius;
+        cell.nneighbors_AFEM = 60;
+        cell.nneighbors_AFEM1 = 54;
+        cell.nneighbors_AFEM2 = 24;
+        cell.particle_volume = 4.0 * sqrt(2.0) * pow(radius, 3); /* volume of unit cell 1, rhombic dodecahedron */
+    }
+
+    if (lattice == 4) /* body centered cubic  */
+    {
+        cell.dim = 3;
+        cell.nneighbors = 14;
+        cell.nneighbors1 = 8;
+        cell.nneighbors2 = 6;
+        cell.radius = radius;
+        cell.neighbor1_cutoff = 2.0 * radius;
+        cell.neighbor2_cutoff = 4.0 / sqrt(3.0) * radius;
+        cell.nneighbors_AFEM = 40;
+        cell.nneighbors_AFEM1 = 34;
+        cell.nneighbors_AFEM2 = 24;
+        cell.particle_volume = 32.0 * sqrt(3.0) / 9.0 * pow(radius, 3); /* volume of unit cell 1, truncated octahedron */
+    }
+
+    return cell;
+}
+
+void createCuboid(struct UnitCell cell)
+{
+    int i, j, k, n, nparticle_t, particles_first_row, rows, layers;
     double x, y, z, a;
     double **xyz_t, p[3] = {0};
 
@@ -16,7 +99,7 @@ void createCuboid()
     int lda = 3, incx = 1, incy = 1;
     double blasAlpha = 1.0, blasBeta = 0.0;
 
-    if (dim == 2)
+    if (cell.dim == 2)
         a = sqrt(pow(box_x, 2) + pow(box_y, 2));
     else
         a = sqrt(pow(box_x, 2) + pow(box_y, 2) + pow(box_z, 2));
@@ -93,23 +176,13 @@ void createCuboid()
         R_matrix[8] = cos(angle2);
     }
 
-    if (lattice == 0) /* 2D square lattice (double layer neighbor) */
+    if (cell.lattice == 0) /* 2D square lattice (double layer neighbor) */
     {
         /* model parameters */
-        hx = 2 * radius;
+        hx = 2 * cell.radius;
         hy = hx;
         particles_first_row = floor((box_t[1] - box_t[0]) / hx);
         rows = floor((box_t[3] - box_t[2]) / hy);
-
-        nneighbors = 8;
-        nneighbors1 = 4;
-        nneighbors2 = 4;
-        neighbor1_cutoff = 2.0 * radius;
-        neighbor2_cutoff = 2.0 * sqrt(2.0) * radius;
-        nneighbors_AFEM = 16;
-        nneighbors_AFEM1 = 12;
-        nneighbors_AFEM2 = 12;
-        particle_volume = 4 * pow(radius, 2) * box_z; /* volume of unit cell */
 
         nparticle = 0;
         nparticle_t = particles_first_row * rows;
@@ -119,10 +192,10 @@ void createCuboid()
         k = 0;
         for (j = 1; j <= rows; j++)
         {
-            y = box_t[2] + hy * (j - 1) + radius;
+            y = box_t[2] + hy * (j - 1) + cell.radius;
             for (i = 1; i <= particles_first_row; i++, k++)
             {
-                x = box_t[0] + hx * (i - 1) + radius;
+                x = box_t[0] + hx * (i - 1) + cell.radius;
                 if (k < nparticle_t)
                 {
                     xyz_t[k][0] = x;
@@ -160,23 +233,13 @@ void createCuboid()
         freeDouble2D(xyz_t, nparticle_t);
     }
 
-    if (lattice == 1) /* 2D hexagon lattice (double layer neighbor) */
+    if (cell.lattice == 1) /* 2D hexagon lattice (double layer neighbor) */
     {
         /* model parameters */
-        hx = 2 * radius;
+        hx = 2 * cell.radius;
         hy = hx * sqrt(3.0) / 2.0;
         particles_first_row = 1 + floor((box_t[1] - box_t[0]) / hx);
         rows = 1 + floor((box_t[3] - box_t[2]) / hy);
-
-        nneighbors = 12;
-        nneighbors1 = 6;
-        nneighbors2 = 6;
-        neighbor1_cutoff = 2.0 * radius;
-        neighbor2_cutoff = 2.0 * sqrt(3.0) * radius;
-        nneighbors_AFEM = 30;
-        nneighbors_AFEM1 = 18;
-        nneighbors_AFEM2 = 18;
-        particle_volume = 2 * sqrt(3) * pow(radius, 2) * box_z; /* volume of unit cell */
 
         nparticle = 0;
         nparticle_t = particles_first_row * floor((rows + 1) / 2.0) + (particles_first_row - 1) * (rows - floor((rows + 1) / 2.0));
@@ -238,25 +301,15 @@ void createCuboid()
         freeDouble2D(xyz_t, nparticle_t);
     }
 
-    if (lattice == 2) /* simple cubic */
+    if (cell.lattice == 2) /* simple cubic */
     {
         /* model parameters */
-        hx = 2 * radius;
+        hx = 2 * cell.radius;
         hy = hx;
         hz = hx;
         particles_first_row = 1 + (int)floor((box_t[1] - box_t[0]) / hx);
         rows = 1 + (int)floor((box_t[3] - box_t[2]) / hy);
         layers = 1 + (int)floor((box_t[5] - box_t[4]) / hz);
-
-        nneighbors = 18;
-        nneighbors1 = 6;
-        nneighbors2 = 12;
-        neighbor1_cutoff = 2.0 * radius;
-        neighbor2_cutoff = 2.0 * sqrt(2.0) * radius;
-        nneighbors_AFEM = 60;
-        nneighbors_AFEM1 = 24;
-        nneighbors_AFEM2 = 54;
-        particle_volume = pow(2 * radius, 3); /* volume of unit cell */
 
         nparticle = 0;
         nparticle_t = (int)particles_first_row * rows * layers;
@@ -318,33 +371,20 @@ void createCuboid()
         double ref_bond_vectorLocal[18][3] = {
             {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {-1, 0, 0}, {0, -1, 0}, {0, 0, -1}, {1 / sqrt(2), 1 / sqrt(2), 0}, {1 / sqrt(2), 0, 1 / sqrt(2)}, {0, 1 / sqrt(2), 1 / sqrt(2)}, {-1 / sqrt(2), -1 / sqrt(2), 0}, {-1 / sqrt(2), 0, -1 / sqrt(2)}, {0, -1 / sqrt(2), -1 / sqrt(2)}, {1 / sqrt(2), -1 / sqrt(2), 0}, {1 / sqrt(2), 0, -1 / sqrt(2)}, {0, 1 / sqrt(2), -1 / sqrt(2)}, {-1 / sqrt(2), 1 / sqrt(2), 0}, {-1 / sqrt(2), 0, 1 / sqrt(2)}, {0, -1 / sqrt(2), 1 / sqrt(2)}};
 
-        bond_vector = allocDouble2D(nneighbors, dim, 0);
-        for (i = 0; i < nneighbors; i++)
+        bond_vector = allocDouble2D(cell.nneighbors, cell.dim, 0);
+        for (i = 0; i < cell.nneighbors; i++)
             cblas_dgemv(layout, trans, 3, 3, blasAlpha, R_matrix, lda, ref_bond_vectorLocal[i], incx, blasBeta, bond_vector[i], incy);
     }
 
-    if (lattice == 3) /* face centered cubic  */
+    if (cell.lattice == 3) /* face centered cubic  */
     {
         /* model parameters */
-        hx = 4 * radius / sqrt(2.0);
+        hx = 4 * cell.radius / sqrt(2.0);
         hy = hx;
         hz = hx;
         particles_first_row = 1 + (int)floor((box_t[1] - box_t[0]) / hx);
         rows = 1 + (int)floor((box_t[3] - box_t[2]) / (hy / 2.0));
         layers = 1 + (int)floor((box_t[5] - box_t[4]) / (hz / 2.0));
-
-        nneighbors = 18;
-        nneighbors1 = 12;
-        nneighbors2 = 6;
-        neighbor1_cutoff = 2.0 * radius;
-        neighbor2_cutoff = 2.0 * sqrt(2.0) * radius;
-        nneighbors_AFEM = 60;
-        nneighbors_AFEM1 = 54;
-        nneighbors_AFEM2 = 24;
-        /* particle_volume = 0.25 * (15 + 7 * sqrt(5.0))* pow(2.0 * radius / sqrt(3.0), 3); volume of regular dodecahedron */
-        particle_volume = 4.0 * sqrt(2.0) * pow(radius, 3); /* volume of unit cell 1, rhombic dodecahedron */
-        /* particle_volume1 = 4.0 * sqrt(2.0) * pow(radius, 3); volume of unit cell 1 */
-        /* particle_volume2 = 16.0 * sqrt(2.0) * pow(radius, 3); volume of unit cell 2 */
 
         nparticle = 0;
         nparticle_t = (int)(floor((layers + 1) / 2.0) * (particles_first_row * floor((rows + 1) / 2.0) + (particles_first_row - 1) * floor(rows / 2.0)) +
@@ -447,7 +487,7 @@ void createCuboid()
                 p[1] >= box[2] && p[1] <= box[3] &&
                 p[2] >= box[4] && p[2] <= box[5])
             {
-                //printf("%f, %f, %f\n", p[0], p[1], p[2]);
+                // printf("%f, %f, %f\n", p[0], p[1], p[2]);
                 xyz[k][0] = p[0];
                 xyz[k][1] = p[1];
                 xyz[k][2] = p[2];
@@ -458,29 +498,19 @@ void createCuboid()
         freeDouble2D(xyz_t, nparticle_t);
     }
 
-    if (lattice == 4) /* body centered cubic  */
+    if (cell.lattice == 4) /* body centered cubic  */
     {
         /* model parameters */
-        hx = 4.0 / sqrt(3.0) * radius;
+        hx = 4.0 / sqrt(3.0) * cell.radius;
         hy = hx;
         hz = hx;
         particles_first_row = 1 + (int)floor((box_t[1] - box_t[0]) / hx);
         rows = 1 + (int)floor((box_t[3] - box_t[2]) / hy);
         layers = 1 + (int)floor((box_t[5] - box_t[4]) / (hz / 2.0));
 
-        nneighbors = 14;
-        nneighbors1 = 8;
-        nneighbors2 = 6;
-        neighbor1_cutoff = 2.0 * radius;
-        neighbor2_cutoff = 4.0 / sqrt(3.0) * radius;
-        nneighbors_AFEM = 40;
-        nneighbors_AFEM1 = 34;
-        nneighbors_AFEM2 = 24;
-        particle_volume = 32.0 * sqrt(3.0) / 9.0 * pow(radius, 3); /* volume of unit cell 1, truncated octahedron */
-
         nparticle = 0;
         nparticle_t = (int)floor((layers + 1) / 2.0) * (particles_first_row * rows) + (int)floor(layers / 2.0) * ((particles_first_row - 1) * (rows - 1));
-        //printf("%d\n", nparticle_t);
+        // printf("%d\n", nparticle_t);
         xyz_t = allocDouble2D(nparticle_t, 3, 0);
 
         /* initialize the particle xyz*/
@@ -515,7 +545,7 @@ void createCuboid()
                         x = box_t[0] + hx * (i - 1) + hx / 2.0;
                         if (n < nparticle_t)
                         {
-                            //printf("%f %f %f\n", x, y, z);
+                            // printf("%f %f %f\n", x, y, z);
                             xyz_t[n][0] = x;
                             xyz_t[n][1] = y;
                             xyz_t[n][2] = z;
@@ -547,7 +577,7 @@ void createCuboid()
                 p[1] >= box[2] && p[1] <= box[3] &&
                 p[2] >= box[4] && p[2] <= box[5])
             {
-                //printf("%f, %f, %f\n", p[0], p[1], p[2]);
+                // printf("%f, %f, %f\n", p[0], p[1], p[2]);
                 xyz[k][0] = p[0];
                 xyz[k][1] = p[1];
                 xyz[k][2] = p[2];
@@ -560,9 +590,9 @@ void createCuboid()
 }
 
 /* define the slip systems for crystal plasticity calculations */
-void slipSysDefine3D()
+void slipSysDefine3D(struct UnitCell cell)
 {
-    if (lattice == 3) /* face centered cubic  */
+    if (cell.lattice == 3) /* face centered cubic  */
     {
         nslip_face = 4;                                            /* number of crystal slip planes */
         max_nslip_vector = 6;                                      /* max number of slip vectors */
@@ -583,7 +613,7 @@ void slipSysDefine3D()
             {{-1 / sqrt(2), 1 / sqrt(2), 0}, {1 / sqrt(2), -1 / sqrt(2), 0}, {1 / sqrt(2), 0, 1 / sqrt(2)}, {-1 / sqrt(2), 0, -1 / sqrt(2)}, {0, -1 / sqrt(2), -1 / sqrt(2)}, {0, 1 / sqrt(2), 1 / sqrt(2)}}};
 
         // if don't consider opposite slip directions
-        //double slip_vectorLocal[4][3][3] = {
+        // double slip_vectorLocal[4][3][3] = {
         //    { { 1 / sqrt(2), -1 / sqrt(2), 0 }, { -1 / sqrt(2), 0, 1 / sqrt(2) }, { 0, 1 / sqrt(2), -1 / sqrt(2) } }, \
         //    {{ 1 / sqrt(2), 0, 1 / sqrt(2) }, { -1 / sqrt(2), -1 / sqrt(2), 0 }, { 0, 1 / sqrt(2), -1 / sqrt(2) }}, \
         //    {{ -1 / sqrt(2), 0, 1 / sqrt(2) }, { 0, -1 / sqrt(2), -1 / sqrt(2) }, { 1 / sqrt(2), 1 / sqrt(2), 0 } }, \
@@ -636,7 +666,7 @@ void slipSysDefine3D()
             }
         }
     }
-    else if (lattice == 4) /* body centered cubic (1 type of slip systems) */
+    else if (cell.lattice == 4) /* body centered cubic (1 type of slip systems) */
     {
         nslip_face = 6;                                            /* number of slip planes for one particle */
         nslipSys = 24;                                             /* the total number of slip systems */
@@ -715,7 +745,7 @@ void slipSysDefine3D()
             }
         }
     }
-    else if (lattice == 5) /* body centered cubic (2 types of slip systems) */
+    else if (cell.lattice == 5) /* body centered cubic (2 types of slip systems) */
     {
         nslip_face = 18;                                           /* number of slip planes for one particle */
         nslipSys = 48;                                             /* the total number of slip systems */
@@ -1117,33 +1147,33 @@ void defineCrack(double a1, double a2, double h)
 }
 
 /* allocate memories for some global matrices */
-void initMatrices()
+void initMatrices(struct UnitCell cell)
 {
-    disp = allocDouble1D(dim * nparticle, 0);        /* global displacement vector */
+    disp = allocDouble1D(cell.dim * nparticle, 0);        /* global displacement vector */
     xyz_initial = allocDouble2D(nparticle, NDIM, 0); /* store coordinate information as 3D */
     xyz_temp = allocDouble2D(nparticle, NDIM, 0);
 
-    distance = allocDouble2D(nparticle, nneighbors, 0.0);
-    distance_initial = allocDouble2D(nparticle, nneighbors, 0.0);
-    csx = allocDouble2D(nparticle, nneighbors, 0.0);
-    csy = allocDouble2D(nparticle, nneighbors, 0.0);
-    csz = allocDouble2D(nparticle, nneighbors, 0.0);
-    csx_initial = allocDouble2D(nparticle, nneighbors, 0.0);
-    csy_initial = allocDouble2D(nparticle, nneighbors, 0.0);
-    csz_initial = allocDouble2D(nparticle, nneighbors, 0.0);
+    distance = allocDouble2D(nparticle, cell.nneighbors, 0.0);
+    distance_initial = allocDouble2D(nparticle, cell.nneighbors, 0.0);
+    csx = allocDouble2D(nparticle, cell.nneighbors, 0.0);
+    csy = allocDouble2D(nparticle, cell.nneighbors, 0.0);
+    csz = allocDouble2D(nparticle, cell.nneighbors, 0.0);
+    csx_initial = allocDouble2D(nparticle, cell.nneighbors, 0.0);
+    csy_initial = allocDouble2D(nparticle, cell.nneighbors, 0.0);
+    csz_initial = allocDouble2D(nparticle, cell.nneighbors, 0.0);
 
     // bond geometric measure
-    dL = allocDouble2D(nparticle, nneighbors, 0.0); /* total bond stretch */
+    dL = allocDouble2D(nparticle, cell.nneighbors, 0.0); /* total bond stretch */
     dL_total = allocDouble2D(nparticle, 2, 0);
     TdL_total = allocDouble2D(nparticle, 2, 0);
-    dL_ave = allocDouble2D(nparticle, nneighbors, 0.); /* average bond stretch */
-    dLp = allocDouble3D(nparticle, nneighbors, 3, 0.); /* total plastic bond stretch */
-    ddL = allocDouble2D(nparticle, nneighbors, 0.0);
+    dL_ave = allocDouble2D(nparticle, cell.nneighbors, 0.); /* average bond stretch */
+    dLp = allocDouble3D(nparticle, cell.nneighbors, 3, 0.); /* total plastic bond stretch */
+    ddL = allocDouble2D(nparticle, cell.nneighbors, 0.0);
     ddL_total = allocDouble2D(nparticle, 2, 0);
     TddL_total = allocDouble2D(nparticle, 2, 0);
-    ddLp = allocDouble2D(nparticle, nneighbors, 0.);       /* incremental plastic bond stretch */
-    bond_stress = allocDouble2D(nparticle, nneighbors, 0); /* bond stress, projection of stress tensor */
-    bond_stretch = allocDouble2D(nparticle, nneighbors, 0);
+    ddLp = allocDouble2D(nparticle, cell.nneighbors, 0.);       /* incremental plastic bond stretch */
+    bond_stress = allocDouble2D(nparticle, cell.nneighbors, 0); /* bond stress, projection of stress tensor */
+    bond_stretch = allocDouble2D(nparticle, cell.nneighbors, 0);
 
     state_v = allocInt1D(nparticle, 0);
     pl_flag = allocInt1D(nparticle, 0); /* denote whether the plastic deformtion has been calculated, to avoid repetition */
@@ -1151,38 +1181,38 @@ void initMatrices()
     nb = allocInt1D(nparticle, -1);         /* number of normal bonds */
     nb_initial = allocInt1D(nparticle, -1); /* initial number of normal bonds */
     nb_conn = allocInt1D(nparticle, -1);    /* number of connections, including itself */
-    neighbors = allocInt2D(nparticle, nneighbors, -1);
-    neighbors1 = allocInt2D(nparticle, nneighbors1, -1);
-    neighbors2 = allocInt2D(nparticle, nneighbors2, -1);
-    nsign = allocInt2D(nparticle, nneighbors, -1);
-    conn = allocInt2D(nparticle, nneighbors_AFEM + 1, -1); /* connection of AFEM particles */
+    neighbors = allocInt2D(nparticle, cell.nneighbors, -1);
+    neighbors1 = allocInt2D(nparticle, cell.nneighbors1, -1);
+    neighbors2 = allocInt2D(nparticle, cell.nneighbors2, -1);
+    nsign = allocInt2D(nparticle, cell.nneighbors, -1);
+    conn = allocInt2D(nparticle, cell.nneighbors_AFEM + 1, -1); /* connection of AFEM particles */
 
     K_pointer = allocInt2D(nparticle + 1, 2, 0);
 
-    residual = allocDouble1D(dim * nparticle, 0);  /* right hand side, residual */
+    residual = allocDouble1D(cell.dim * nparticle, 0);  /* right hand side, residual */
     Pin = allocDouble1D(NDIM * nparticle, 0);      /* total internal force, fixed 3 dimension */
-    Pex = allocDouble1D(dim * nparticle, 0);       /* total external force */
-    Pex_temp = allocDouble1D(dim * nparticle, 0);  /* temp external force */
-    dispBC_index = allocInt1D(dim * nparticle, 1); /* disp info for each degree of freedom, 0 as being applied disp BC */
-    fix_index = allocInt1D(dim * nparticle, 1);    /* fix info for each degree of freedom, 0 as being fixed */
+    Pex = allocDouble1D(cell.dim * nparticle, 0);       /* total external force */
+    Pex_temp = allocDouble1D(cell.dim * nparticle, 0);  /* temp external force */
+    dispBC_index = allocInt1D(cell.dim * nparticle, 1); /* disp info for each degree of freedom, 0 as being applied disp BC */
+    fix_index = allocInt1D(cell.dim * nparticle, 1);    /* fix info for each degree of freedom, 0 as being fixed */
 
-    Kn = allocDouble2D(nparticle, nneighbors, 0.0);
-    Tv = allocDouble2D(nparticle, nneighbors, 0.0);
+    Kn = allocDouble2D(nparticle, cell.nneighbors, 0.0);
+    Tv = allocDouble2D(nparticle, cell.nneighbors, 0.0);
 
     stress_tensor = allocDouble2D(nparticle, 2 * NDIM, 0.);
     strain_tensor = allocDouble2D(nparticle, 2 * NDIM, 0.);
 
     // damage parameters
-    damage_broken = allocDouble2D(nparticle, nneighbors, 1.); /* crack index parameter */
-    damage_D = allocDouble3D(nparticle, nneighbors, 2, 0.);   /* bond-associated damage parameter, initially be 0, state variable */
-    damage_w = allocDouble2D(nparticle, nneighbors, 1.);      /* intact parameter, apply on bond force */
+    damage_broken = allocDouble2D(nparticle, cell.nneighbors, 1.); /* crack index parameter */
+    damage_D = allocDouble3D(nparticle, cell.nneighbors, 2, 0.);   /* bond-associated damage parameter, initially be 0, state variable */
+    damage_w = allocDouble2D(nparticle, cell.nneighbors, 1.);      /* intact parameter, apply on bond force */
     damage_visual = allocDouble1D(nparticle, 0.0);            /* damage indicator for visualization */
     damage_local = allocDouble2D(nparticle, 2, 0.0);          /* damage variable used in continuum damage mechanics */
     damage_nonlocal = allocDouble2D(nparticle, 2, 0.0);       /* nonlocal damage variable used in continuum damage mechanics */
 
-    F = allocDouble2D(nparticle, nneighbors, 0.);          /* FIJ is total bond force between I and J */
-    F_temp = allocDouble2D(nparticle, nneighbors, 0.);     /* F_tempIJ stores the bond force at last time step */
-    bond_force = allocDouble2D(nparticle, nneighbors, 0.); /* Organized bond force in order*/
+    F = allocDouble2D(nparticle, cell.nneighbors, 0.);          /* FIJ is total bond force between I and J */
+    F_temp = allocDouble2D(nparticle, cell.nneighbors, 0.);     /* F_tempIJ stores the bond force at last time step */
+    bond_force = allocDouble2D(nparticle, cell.nneighbors, 0.); /* Organized bond force in order*/
 
     J2_beta = allocDouble3D(nparticle, 2 * NDIM, 3, 0.); /* back stress tensor */
     J2_alpha = allocDouble2D(nparticle, 3, 0.);          /* accumulated equivalent plastic strain */

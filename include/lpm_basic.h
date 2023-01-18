@@ -3,16 +3,19 @@
 #define LPM_BASIC_H
 
 #include <stdio.h>
+#include "lpm.h"
+
+struct UnitCell;
 
 // basic lpm computations
 void setTypeRect(double r0, double r1, double r2, double r3, double r4, double r5, int t);
 void setTypeCircle(double x, double y, double r, int t);
-void setTypeFullNeighbor(int k);
+void setTypeFullNeighbor(int k, struct UnitCell cell);
 void computedL();
-void computeStress();
-void computeStrain();
-void computeBondForce();
-void computeBondStretch();
+void computeStress(struct UnitCell cell);
+void computeStrain(struct UnitCell cell);
+void computeBondForce(struct UnitCell cell);
+void computeBondStretch(struct UnitCell cell);
 
 // basic operations
 int findMaxInt(int *arr, int len);

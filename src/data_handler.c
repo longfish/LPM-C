@@ -257,7 +257,7 @@ void writeBondstretch(const char *dataName, int step)
 }
 
 /* store the bond force information into file */
-void writeBondforce(const char *dataName, int step)
+void writeBondforce(const char *dataName, int step, struct UnitCell cell)
 {
     FILE *fpt;
     fpt = fopen(dataName, "a+");
@@ -267,7 +267,7 @@ void writeBondforce(const char *dataName, int step)
     for (int i = 0; i < nparticle; i++)
     {
         fprintf(fpt, "%d %d ", i, type[i]);
-        for (int m = 0; m < nneighbors; m++)
+        for (int m = 0; m < cell.nneighbors; m++)
             fprintf(fpt, "%.4e ", bond_force[i][m]);
         fprintf(fpt, "\n");
     }

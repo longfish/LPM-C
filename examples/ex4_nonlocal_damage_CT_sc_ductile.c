@@ -269,8 +269,8 @@ int main(int argc, char *argv[])
 
     int nbd = 0, nbf = 0;     // total number of disp or force boundary conditions
     char cal_method[] = "cg"; // calculation method, pardiso or conjugate gradient
-    struct dispBCPara dBP[MAXLINE][MAXSMALL] = {0};
-    struct forceBCPara fBP[MAXSMALL] = {0};
+    struct DispBCs dBP[MAXLINE][MAXSMALL] = {0};
+    struct ForceBCs fBP[MAXSMALL] = {0};
     int load_indicator[MAXLINE] = {0}; // tension (1) or compressive (-1) loading condition for uniaxial loading
 
     // displace boundary conditions

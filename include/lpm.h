@@ -32,7 +32,7 @@
 #include "constitutive.h"
 
 #define PI 3.14159265358979323846
-#define NDIM 3        /* number of dimensions, no matter what dimension of the problem */
+#define NDIM 3        /* max number of dimensions, no matter what dimension of the problem */
 #define TOL 1e-3      /* tolerance to determine whether two quantities are equal */
 #define MAXLINE 500   /* maximum line number */
 #define MAXSMALL 20   /* maximum number used for small iteration etc. */
@@ -50,10 +50,42 @@
 #define SY(x) (620.0 + 3300.0 * (1.0 - exp(-0.4 * x)))                                       /* isotropic hardening function for J2 plasticity, MPa */
 #define DAM_PHI(x) (1.0 / damage_L / sqrt(2 * PI) * exp(-0.5 * x * x / damage_L / damage_L)) /* nonlocal helper function for damage accumulation */
 
+struct DispBCs
+{
+    int type;
+    char flag;
+    double step;
+};
+
+struct ForceBCs
+{
+    int type;
+    char flag1;
+    double step1;
+    char flag2;
+    double step2;
+    char flag3;
+    double step3;
+};
+
+struct BondStrain
+{
+    int i_index;
+    int j_index;
+    double bstrain;
+};
+
+struct UnitCell{
+    int lattice, dim;
+    int nneighbors, nneighbors1, nneighbors2;
+    int nneighbors_AFEM, nneighbors_AFEM1, nneighbors_AFEM2;
+    double radius, neighbor1_cutoff, neighbor2_cutoff, particle_volume; /* volume of unit cell */
+};
+
 /* Declaration of global variables */
 /* int */
-extern int ntype, particles_first_row, nparticle, rows, layers, nneighbors, nneighbors1, nneighbors2, dim;
-extern int lattice, nneighbors_AFEM, nneighbors_AFEM1, nneighbors_AFEM2, plmode, eulerflag, nslip_face;
+extern int nparticle;
+extern int plmode, eulerflag, nslip_face;
 extern int max_nslip_vector, nslipSys, nbreak;
 
 extern int *IK, *JK, *type, *dispBC_index, *fix_index, *nslip_vector, *lacknblist, pbc[NDIM], *pl_flag;
@@ -62,7 +94,7 @@ extern int **neighbors, **neighbors1, **neighbors2, **neighbors_AFEM;
 extern int **K_pointer, **conn, **nsign, **cp_Jact;
 
 /* double precision float */
-extern double radius, hx, hy, hz, neighbor1_cutoff, neighbor2_cutoff, angle1, angle2, angle3, particle_volume;
+extern double hx, hy, hz, angle1, angle2, angle3;
 extern double R_matrix[NDIM * NDIM], box[2 * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
 extern double box_x, box_y, box_z, cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
 extern double damage_threshold, damageb_A, damagec_A, critical_bstrain;
@@ -79,23 +111,5 @@ extern double **dL, **ddL, **bond_stress, **damage_broken, **damage_w, **bond_st
 
 extern double **Kn, **Tv, **J2_alpha, **damage_local, **damage_nonlocal, **cp_A, **cp_dgy, **cp_dA_single, **J2_beta_eq;
 extern double ***slip_vector, ***dLp, ***J2_beta, ***damage_D, ***cp_gy, ***cp_A_single;
-
-struct dispBCPara
-{
-    int type;
-    char flag;
-    double step;
-};
-
-struct forceBCPara
-{
-    int type;
-    char flag1;
-    double step1;
-    char flag2;
-    double step2;
-    char flag3;
-    double step3;
-};
 
 #endif

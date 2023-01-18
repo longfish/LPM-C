@@ -2,7 +2,10 @@
 #ifndef NEIGHBOR_H
 #define NEIGHBOR_H
 
-void searchNormalNeighbor();
-int searchAFEMNeighbor();
+#include "lpm.h"
+struct UnitCell;
+
+void searchNormalNeighbor(struct UnitCell cell);
+int searchAFEMNeighbor(struct UnitCell cell);
 
 #endif

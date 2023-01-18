@@ -1,6 +1,6 @@
 #include "lpm.h"
 
-void solverPARDISO()
+void solverPARDISO(struct UnitCell cell)
 {
     MKL_INT n, idum, maxfct, mnum, mtype, phase, error, error1, msglvl, nrhs, iter;
     MKL_INT iparm[64];
@@ -31,7 +31,7 @@ void solverPARDISO()
                           //iparm[18] = -1;       /* Output: Mflops for LU factorization */
                           //iparm[19] = 0;        /* Output: Numbers of CG Iterations */
 
-    n = dim * nparticle; /* Data number */
+    n = cell.dim * nparticle; /* Data number */
     maxfct = 1;          /* Maximum number of numerical factorizations */
     mnum = 1;            /* Which factorization to use */
     msglvl = 0;          /* 0, no print statistical info; 1, print statistical info */
@@ -86,13 +86,13 @@ void solverPARDISO()
     /* Components of position */
     for (int i = 0; i < nparticle; i++)
     {
-        for (int j = 0; j < dim; j++)
-            xyz[i][j] += disp[dim * i + j];
+        for (int j = 0; j < cell.dim; j++)
+            xyz[i][j] += disp[cell.dim * i + j];
     }
 }
 
 #if 0
-void solverCG()
+void solverCG(struct UnitCell cell)
 {
 
     MKL_INT i, n, rci_request, itercount, mkl_disable_fast_mm;
@@ -185,7 +185,7 @@ success:
 #endif
 
 #if 1
-void solverCG()
+void solverCG(struct UnitCell cell)
 {
     MKL_INT n, rci_request, itercount, mkl_disable_fast_mm;
     MKL_INT ipar[128];
@@ -201,7 +201,7 @@ void solverCG()
     mkl_disable_fast_mm = 1; /* avoid memory leaks */
 
     /* initial setting */
-    n = dim * nparticle; /* Data number */
+    n = cell.dim * nparticle; /* Data number */
     tmp = allocDouble1D(4 * n, 0);
     mkl_sparse_d_create_csr(&csrA, SPARSE_INDEX_BASE_ONE, n, n, IK, IK + 1, JK, K_global);
 
@@ -214,7 +214,7 @@ void solverCG()
         goto failure;
 
     /* modify the initialized solver parameters */
-    ipar[4] = dim * nparticle;
+    ipar[4] = cell.dim * nparticle;
     ipar[8] = 1; /* default value is 0, does not perform the residual stopping test; otherwise, perform the test */
     ipar[9] = 0; /* default value is 1, perform user defined stopping test; otherwise, does not perform the test */
     //ipar[10] = 1; /* use the preconditioned version of the CG method */
@@ -262,8 +262,8 @@ success:
     /* update the position */
     for (int i = 0; i < nparticle; i++)
     {
-        for (int j = 0; j < dim; j++)
-            xyz[i][j] += disp[dim * i + j];
+        for (int j = 0; j < cell.dim; j++)
+            xyz[i][j] += disp[cell.dim * i + j];
     }
     /* free memory */
     free(tmp);
