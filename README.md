@@ -12,9 +12,10 @@ A multi-threaded implementation of a nonlocal lattice particle method (LPM) usin
 
 ### Intel MKL environment
 1. go to the Intel oneAPI website (https://www.intel.com/content/www/us/en/developer/tools/oneapi/overview.html) download and install the base and hpc toolkits (install 2021.4+ version of oneAPI to have a proper support for CMake)
-2. source /opt/intel/oneapi/setvars.sh linux64 --force (directory may change if customize the oneAPI installation)
+2. `source /opt/intel/oneapi/setvars.sh linux64 --force` (directory may change if customize the oneAPI installation)
 3. install Ninja: `sudo apt-get install ninja-build`
-4. note: you may need to add the MKL include path into your editor preference (like VS Code)
+4. install openmp: `sudo apt-get install libomp-dev`
+5. note: you may need to add the MKL include path into your editor preference (like VS Code)
 
 ### Compile and run LPM-C
 1. Clone the project source files into your own machine: `git clone https://github.com/longfish/LPM-C.git` 
