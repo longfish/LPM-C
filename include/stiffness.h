@@ -2,7 +2,7 @@
 #ifndef STIFFNESS_H
 #define STIFFNESS_H
 
-void calcKnTv();
+void calcKnTv(int ntype);
 void updateRR();
 void calcStiffness2DFiniteDifference(int plmode);
 void calcStiffness3DFiniteDifference(int plmode);

@@ -71,7 +71,7 @@ extern double *K_global, *plastic_K_global, *residual, *Pin, *Pex, *Pex_temp, *d
 extern double *reaction_force, *damage_visual;
 extern double *J2_dlambda, *J2_stresseq, *J2_stressm, *J2_triaxiality;
 
-extern double **xyz, **xyz_initial, **xyz_temp, **distance, **distance_initial, **KnTve, **F, **csx, **csy, **csz;
+extern double **xyz, **xyz_initial, **xyz_temp, **distance, **distance_initial, **F, **csx, **csy, **csz;
 extern double **dL_total, **TdL_total, **csx_initial, **csy_initial, **csz_initial, **Ce;
 extern double **slip_normal, **schmid_tensor, **schmid_tensor_local, **cp_RSS, **stress_tensor;
 extern double **cp_Cab, **strain_tensor, **dL_ave, **ddL_total, **TddL_total, **F_temp, **ddLp;

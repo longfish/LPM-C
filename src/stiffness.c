@@ -8,12 +8,13 @@
 
 #include "lpm.h"
 
-void calcKnTv()
+void calcKnTv(int ntype)
 {
+    double **KnTve = allocDouble2D(ntype, 3, 0);
+
     /************************************************* Square *******************************************/
     if (lattice == 0)
     {
-        KnTve = allocDouble2D(ntype, 3, 0);
         double mapping[3 * 3] =
             {1 / 2.0, -1 / 2.0, 0.0,
              0.0, 0.0, 1 / 2.0,
@@ -47,7 +48,6 @@ void calcKnTv()
         /**
          * for isotropic 2D materials
          */
-        KnTve = allocDouble2D(ntype, 2, 0);
         double mapping[2 * 2] =
             {sqrt(3.0) / 12.0, -sqrt(3.0) / 12.0,
              -sqrt(3.0) / 144.0, sqrt(3.0) / 48.0};
@@ -67,7 +67,6 @@ void calcKnTv()
         /**
          * for anisotropic 2D materials
          */
-        // KnTve = allocDouble2D(ntype, 6, 0);
 
         // double mapping[6 * 6] =
         //     {sqrt(3.0) / 16.0, sqrt(3.0) / 16.0, -sqrt(3.0) / 12.0, 0.0, 0.0, -sqrt(3.0) / 8.0,
@@ -144,8 +143,6 @@ void calcKnTv()
     /********************************************** Simple cubic ****************************************/
     if (lattice == 2)
     {
-        KnTve = allocDouble2D(ntype, 3, 0);
-
         /* orthotropic material
         double mapping[9 * 9] =
             {1, 0, 0, -1, 0, 0, -1, -1, 1,
@@ -206,7 +203,6 @@ void calcKnTv()
     /************************************* Face centered cubic, FCC *************************************/
     if (lattice == 3)
     {
-        KnTve = allocDouble2D(ntype, 3, 0);
         double mapping[3 * 3] =
             {0, 0, sqrt(2.0),
              sqrt(2.0) / 4.0, -sqrt(2.0) / 4.0, -sqrt(2.0) / 4.0,
@@ -237,8 +233,6 @@ void calcKnTv()
     /************************************* Body centered cubic, BCC *************************************/
     if (lattice == 4)
     {
-        KnTve = allocDouble2D(ntype, 3, 0);
-
         double mapping[3 * 3] =
             {0., 0., sqrt(3.0),
              1. / sqrt(3.0), -1. / sqrt(3.0), 0.,

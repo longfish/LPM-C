@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
 
     /************************** Simulation begins *************************/
     // compute necessary into before loading starts
-    calcKnTv();
+    calcKnTv(ntype);
     computedL();
 
     // crystal lattice settings
