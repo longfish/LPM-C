@@ -17,7 +17,7 @@
 
 /* definition of global variables */
 /* int */
-int nparticle, dim;
+int nparticle;
 int lattice, plmode, eulerflag, nslip_face;
 int max_nslip_vector, nslipSys, nbreak;
 
@@ -348,13 +348,13 @@ int main(int argc, char *argv[])
         printf("######################################## Loading step %d ######################################\n", i + 1);
         copyDouble2D(xyz_temp, xyz, nparticle, NDIM);
         copyDouble2D(F_temp, F, nparticle, cell.nneighbors);
-        copyDouble1D(Pex_temp, Pex, dim * nparticle);
+        copyDouble1D(Pex_temp, Pex, cell.dim * nparticle);
 
         omp_set_num_threads(nt_force);
         // compute the elastic stiffness matrix
-        if (dim == 2)
+        if (cell.dim == 2)
             calcStiffness2DFiniteDifference(6, cell);
-        else if (dim == 3)
+        else if (cell.dim == 3)
             calcStiffness3DFiniteDifference(6, cell);
 
         double time_t1 = omp_get_wtime();
@@ -371,8 +371,8 @@ int main(int argc, char *argv[])
         updateRR(cell); // residual force vector and reaction force (RR)
 
         // compute the Euclidean norm (L2 norm)
-        double norm_residual = cblas_dnrm2(dim * nparticle, residual, 1);
-        double norm_reaction_force = cblas_dnrm2(countNEqual(dispBC_index, nparticle * dim, 1), reaction_force, 1);
+        double norm_residual = cblas_dnrm2(cell.dim * nparticle, residual, 1);
+        double norm_reaction_force = cblas_dnrm2(countNEqual(dispBC_index, nparticle * cell.dim, 1), reaction_force, 1);
         double tol_multiplier = MAX(norm_residual, norm_reaction_force);
         char tempChar1[] = "residual", tempChar2[] = "reaction";
         printf("\nNorm of residual is %.5e, norm of reaction is %.5e, tolerance criterion is based on ", norm_residual, norm_reaction_force);
@@ -391,12 +391,12 @@ int main(int argc, char *argv[])
 
             // time_t1 = omp_get_wtime();
             // compute the stiffness matrix, then modify it for displacement boundary condition
-            if (dim == 2)
+            if (cell.dim == 2)
             {
                 // calcStiffness2DFiniteDifference(6);
                 setDispBC_stiffnessUpdate2D(cell);
             }
-            else if (dim == 3)
+            else if (cell.dim == 3)
             {
                 // calcStiffness3DFiniteDifference(6);
                 setDispBC_stiffnessUpdate3D(cell);
@@ -422,7 +422,7 @@ int main(int argc, char *argv[])
             // writeDlambda(dlambdaFile, 9039, 9047, i + 1, ni);
 
             updateRR(cell); /* update the RHS risidual force vector */
-            norm_residual = cblas_dnrm2(dim * nparticle, residual, 1);
+            norm_residual = cblas_dnrm2(cell.dim * nparticle, residual, 1);
             printf("Norm of residual is %.3e, residual ratio is %.3e\n", norm_residual, norm_residual / tol_multiplier);
         }
         computeStrain(cell);
@@ -469,9 +469,9 @@ int main(int argc, char *argv[])
             startrun = omp_get_wtime();
             omp_set_num_threads(nt_force);
             // recompute stiffness matrix
-            if (dim == 2)
+            if (cell.dim == 2)
                 calcStiffness2DFiniteDifference(6, cell);
-            else if (dim == 3)
+            else if (cell.dim == 3)
                 calcStiffness3DFiniteDifference(6, cell);
             omp_set_num_threads(nt);
             time_t1 = omp_get_wtime();
