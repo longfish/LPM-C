@@ -39,7 +39,7 @@
 // }
 
 /* write the particle-wise information into LAMMPS dump file type */
-void writeDump(const char *dataName, int step, char flag)
+void writeDump(const char *dataName, int step, char flag, double box[])
 {
     FILE *fpt;
     if (flag == 's')
@@ -335,7 +335,7 @@ void writeReaction(const char *dataName, char c, int t1, int tstep)
 }
 
 /* calculate the reaction force of the lower part (with the ratio p) of the body */
-void writeForce(const char *dataname, char c, double p, int tstep)
+void writeForce(const char *dataname, char c, double p, int tstep, double box[])
 {
     FILE *fpt;
     fpt = fopen(dataname, "a+");
@@ -348,7 +348,7 @@ void writeForce(const char *dataname, char c, double p, int tstep)
     {
         if (c == 'x')
         {
-            if (xyz_initial[i][0] < box[0] + p * (box_x))
+            if (xyz_initial[i][0] < box[0] + p * (box[1]-box[0]))
             {
                 temp_BC[nbd] = i;
                 nbd += 1;
@@ -356,7 +356,7 @@ void writeForce(const char *dataname, char c, double p, int tstep)
         }
         else if (c == 'y')
         {
-            if (xyz_initial[i][1] < box[2] + p * (box_y))
+            if (xyz_initial[i][1] < box[2] + p * (box[3]-box[2]))
             {
                 temp_BC[nbd] = i;
                 nbd += 1;
@@ -364,7 +364,7 @@ void writeForce(const char *dataname, char c, double p, int tstep)
         }
         else if (c == 'z')
         {
-            if (xyz_initial[i][2] < box[4] + p * (box_z))
+            if (xyz_initial[i][2] < box[4] + p * (box[5]-box[4]))
             {
                 temp_BC[nbd] = i;
                 nbd += 1;

@@ -28,8 +28,8 @@ int **K_pointer, **conn, **nsign, **cp_Jact;
 
 /* double precision float */
 double hx, hy, hz, angle1, angle2, angle3;
-double R_matrix[NDIM * NDIM], box[2 * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
-double box_x, box_y, box_z, cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
+double R_matrix[NDIM * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
+double cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
 double damage_threshold, damageb_A, damagec_A, critical_bstrain;
 
 double *K_global, *plastic_K_global, *residual, *Pin, *Pex, *Pex_temp, *disp, *sigmay, *cp_dA;
@@ -99,22 +99,8 @@ int main(int argc, char *argv[])
 
     // simulation box size, double
     // xmin; xmax; ymin; ymax; zmin; zmax
-    // box[0] = 0.0, box[1] = 0.01; // 3D
-    // box[2] = 0.00971 - 0.01, box[3] = 0.0097150;
-    // box[4] = 0.02970 - 0.03, box[5] = 0.029830;
-    box[0] = -0.2, box[1] = 10.2;
-    box[2] = -0.2, box[3] = 10.2;
-    box[4] = -0.2, box[5] = 10.2;
-    // box[0] = 0.0, box[1] = 50.0; // 3D plate, mm
-    // box[2] = 0.0, box[3] = 48.0;
-    // box[4] = 0.0, box[5] = 10.0;
-    // box[0] = 0.0, box[1] = 20.0; // 2D square plate, mm
-    // box[2] = 0.0, box[3] = 20.0;
-    // box[4] = 0.0, box[5] = 1.0;
-    box_x = box[1] - box[0]; // box size
-    box_y = box[3] - box[2];
-    box_z = box[5] - box[4];
-    createCuboid(cell);
+    double box[] = {-0.2, 10.2, -0.2, 10.2, -0.2, 10.2};
+    createCuboid(box, cell);
 
     // (if applicable) read particle information in lammps format
     // char tempFile[] = "Fe_supercell.lmp";
@@ -124,7 +110,7 @@ int main(int argc, char *argv[])
     // move the particles coordinates
     double movexyz[] = {-0., -0., -0.};
     // double movexyz[] = {-0.0, 0., 0.};
-    moveParticle(movexyz);
+    moveParticle(movexyz, box);
 
     // create a pre-existed crack
     // double ca1 = -10.0, ca2 = 5 + 0.3 * radius, w = 0.372, ch = 10.0287;
@@ -320,7 +306,7 @@ int main(int argc, char *argv[])
         writeReaction(forceFile, aflag, dtype, 0);
         // writeForce(forceFile, aflag, 0.3, 0); // lower half body force
     }
-    writeDump(dumpFile, 0, dumpflag);
+    writeDump(dumpFile, 0, dumpflag, box);
 
     // writeCab(cabFile, 0);
     // writeCab(cabFile, 288);
@@ -451,7 +437,7 @@ int main(int argc, char *argv[])
                 writeReaction(forceFile, aflag, dtype, i + 1);
                 // writeForce(forceFile, aflag, 0.3, i + 1);
             }
-            writeDump(dumpFile, i + 1, dumpflag); /* print particle position info */
+            writeDump(dumpFile, i + 1, dumpflag, box); /* print particle position info */
 
             if (plmode == 1)
             {

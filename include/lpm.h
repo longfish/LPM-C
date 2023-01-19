@@ -95,8 +95,8 @@ extern int **K_pointer, **conn, **nsign, **cp_Jact;
 
 /* double precision float */
 extern double hx, hy, hz, angle1, angle2, angle3;
-extern double R_matrix[NDIM * NDIM], box[2 * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
-extern double box_x, box_y, box_z, cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
+extern double R_matrix[NDIM * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
+extern double cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
 extern double damage_threshold, damageb_A, damagec_A, critical_bstrain;
 
 extern double *K_global, *plastic_K_global, *residual, *Pin, *Pex, *Pex_temp, *disp, *sigmay, *cp_dA;

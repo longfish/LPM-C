@@ -20,7 +20,7 @@ struct UnitCell createUnitCell(int lattice, double radius)
         cell.nneighbors_AFEM = 16;
         cell.nneighbors_AFEM1 = 12;
         cell.nneighbors_AFEM2 = 12;
-        cell.particle_volume = 4 * pow(radius, 2) * box_z; /* volume of unit cell */
+        cell.particle_volume = 4 * pow(radius, 2); /* volume (area) of unit cell */
     }
 
     if (lattice == 1) /* 2D hexagon lattice (double layer neighbor) */
@@ -35,7 +35,7 @@ struct UnitCell createUnitCell(int lattice, double radius)
         cell.radius = radius;
         cell.neighbor1_cutoff = 2.0 * radius;
         cell.neighbor2_cutoff = 2.0 * sqrt(3.0) * radius;
-        cell.particle_volume = 2 * sqrt(3) * pow(radius, 2) * box_z; /* volume of unit cell */
+        cell.particle_volume = 2 * sqrt(3) * pow(radius, 2); /* volume (area) of unit cell */
     }
 
     if (lattice == 2) /* simple cubic */
@@ -86,7 +86,7 @@ struct UnitCell createUnitCell(int lattice, double radius)
     return cell;
 }
 
-void createCuboid(struct UnitCell cell)
+void createCuboid(double box[], struct UnitCell cell)
 {
     int i, j, k, n, nparticle_t, particles_first_row, rows, layers;
     double x, y, z, a;
@@ -100,9 +100,9 @@ void createCuboid(struct UnitCell cell)
     double blasAlpha = 1.0, blasBeta = 0.0;
 
     if (cell.dim == 2)
-        a = sqrt(pow(box_x, 2) + pow(box_y, 2));
+        a = sqrt(pow(box[1]-box[0], 2) + pow(box[3]-box[2], 2));
     else
-        a = sqrt(pow(box_x, 2) + pow(box_y, 2) + pow(box_z, 2));
+        a = sqrt(pow(box[1]-box[0], 2) + pow(box[3]-box[2], 2) + pow(box[5]-box[4], 2));
 
     double box_t[6] = {-a, a, -a, a, -a, a};
 
@@ -857,7 +857,7 @@ void slipSysDefine3D(struct UnitCell cell)
 }
 
 /* apply a rigid translation to the particle system */
-void moveParticle(double *movexyz)
+void moveParticle(double *movexyz, double box[])
 {
     double **xyz_t = allocDouble2D(nparticle, 3, 0.);
 
