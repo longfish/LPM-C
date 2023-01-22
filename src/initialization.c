@@ -86,10 +86,10 @@ struct UnitCell createUnitCell(int lattice, double radius)
     return cell;
 }
 
-void createCuboid(double box[], struct UnitCell cell)
+void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angles[])
 {
     int i, j, k, n, nparticle_t, particles_first_row, rows, layers;
-    double x, y, z, a;
+    double x, y, z, a, angle1, angle2, angle3;
     double **xyz_t, p[3] = {0};
 
     /* settings for matrix-vector product, BLAS */
@@ -121,6 +121,7 @@ void createCuboid(double box[], struct UnitCell cell)
     // R = [c3  -s3   0]  or R = [c3  -s3]
     //     [s3   c3   0]         [s3   c3]
     //     [0     0   1]
+    angle1 = angles[0], angle2 = angles[1], angle3 = angles[2];
 
     if (eulerflag == 0)
     {
@@ -857,7 +858,7 @@ void slipSysDefine3D(struct UnitCell cell)
 }
 
 /* apply a rigid translation to the particle system */
-void moveParticle(double *movexyz, double box[])
+void moveParticle(double box[], double *movexyz)
 {
     double **xyz_t = allocDouble2D(nparticle, 3, 0.);
 
@@ -1146,79 +1147,4 @@ void defineCrack(double a1, double a2, double h)
     }
 }
 
-/* allocate memories for some global matrices */
-void initMatrices(struct UnitCell cell)
-{
-    disp = allocDouble1D(cell.dim * nparticle, 0);        /* global displacement vector */
-    xyz_initial = allocDouble2D(nparticle, NDIM, 0); /* store coordinate information as 3D */
-    xyz_temp = allocDouble2D(nparticle, NDIM, 0);
 
-    distance = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    distance_initial = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    csx = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    csy = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    csz = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    csx_initial = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    csy_initial = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    csz_initial = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-
-    // bond geometric measure
-    dL = allocDouble2D(nparticle, cell.nneighbors, 0.0); /* total bond stretch */
-    dL_total = allocDouble2D(nparticle, 2, 0);
-    TdL_total = allocDouble2D(nparticle, 2, 0);
-    dL_ave = allocDouble2D(nparticle, cell.nneighbors, 0.); /* average bond stretch */
-    dLp = allocDouble3D(nparticle, cell.nneighbors, 3, 0.); /* total plastic bond stretch */
-    ddL = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    ddL_total = allocDouble2D(nparticle, 2, 0);
-    TddL_total = allocDouble2D(nparticle, 2, 0);
-    ddLp = allocDouble2D(nparticle, cell.nneighbors, 0.);       /* incremental plastic bond stretch */
-    bond_stress = allocDouble2D(nparticle, cell.nneighbors, 0); /* bond stress, projection of stress tensor */
-    bond_stretch = allocDouble2D(nparticle, cell.nneighbors, 0);
-
-    state_v = allocInt1D(nparticle, 0);
-    pl_flag = allocInt1D(nparticle, 0); /* denote whether the plastic deformtion has been calculated, to avoid repetition */
-
-    nb = allocInt1D(nparticle, -1);         /* number of normal bonds */
-    nb_initial = allocInt1D(nparticle, -1); /* initial number of normal bonds */
-    nb_conn = allocInt1D(nparticle, -1);    /* number of connections, including itself */
-    neighbors = allocInt2D(nparticle, cell.nneighbors, -1);
-    neighbors1 = allocInt2D(nparticle, cell.nneighbors1, -1);
-    neighbors2 = allocInt2D(nparticle, cell.nneighbors2, -1);
-    nsign = allocInt2D(nparticle, cell.nneighbors, -1);
-    conn = allocInt2D(nparticle, cell.nneighbors_AFEM + 1, -1); /* connection of AFEM particles */
-
-    K_pointer = allocInt2D(nparticle + 1, 2, 0);
-
-    residual = allocDouble1D(cell.dim * nparticle, 0);  /* right hand side, residual */
-    Pin = allocDouble1D(NDIM * nparticle, 0);      /* total internal force, fixed 3 dimension */
-    Pex = allocDouble1D(cell.dim * nparticle, 0);       /* total external force */
-    Pex_temp = allocDouble1D(cell.dim * nparticle, 0);  /* temp external force */
-    dispBC_index = allocInt1D(cell.dim * nparticle, 1); /* disp info for each degree of freedom, 0 as being applied disp BC */
-    fix_index = allocInt1D(cell.dim * nparticle, 1);    /* fix info for each degree of freedom, 0 as being fixed */
-
-    Kn = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-    Tv = allocDouble2D(nparticle, cell.nneighbors, 0.0);
-
-    stress_tensor = allocDouble2D(nparticle, 2 * NDIM, 0.);
-    strain_tensor = allocDouble2D(nparticle, 2 * NDIM, 0.);
-
-    // damage parameters
-    damage_broken = allocDouble2D(nparticle, cell.nneighbors, 1.); /* crack index parameter */
-    damage_D = allocDouble3D(nparticle, cell.nneighbors, 2, 0.);   /* bond-associated damage parameter, initially be 0, state variable */
-    damage_w = allocDouble2D(nparticle, cell.nneighbors, 1.);      /* intact parameter, apply on bond force */
-    damage_visual = allocDouble1D(nparticle, 0.0);            /* damage indicator for visualization */
-    damage_local = allocDouble2D(nparticle, 2, 0.0);          /* damage variable used in continuum damage mechanics */
-    damage_nonlocal = allocDouble2D(nparticle, 2, 0.0);       /* nonlocal damage variable used in continuum damage mechanics */
-
-    F = allocDouble2D(nparticle, cell.nneighbors, 0.);          /* FIJ is total bond force between I and J */
-    F_temp = allocDouble2D(nparticle, cell.nneighbors, 0.);     /* F_tempIJ stores the bond force at last time step */
-    bond_force = allocDouble2D(nparticle, cell.nneighbors, 0.); /* Organized bond force in order*/
-
-    J2_beta = allocDouble3D(nparticle, 2 * NDIM, 3, 0.); /* back stress tensor */
-    J2_alpha = allocDouble2D(nparticle, 3, 0.);          /* accumulated equivalent plastic strain */
-    J2_beta_eq = allocDouble2D(nparticle, 3, 0.);        /* equivalent back stress */
-    J2_stresseq = allocDouble1D(nparticle, 0.);          /* von-Mises equivalent stress */
-    J2_stressm = allocDouble1D(nparticle, 0.);           /* hydrostatic stress */
-    J2_triaxiality = allocDouble1D(nparticle, 0.);       /* ratio of the hydrostatic stress to von-Mises equivalent stress */
-    J2_dlambda = allocDouble1D(nparticle, 0.);           /* incremental equivalent plastic strain */
-}

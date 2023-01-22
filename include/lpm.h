@@ -85,16 +85,16 @@ struct UnitCell{
 /* Declaration of global variables */
 /* int */
 extern int nparticle;
-extern int plmode, eulerflag, nslip_face;
+extern int nslip_face;
 extern int max_nslip_vector, nslipSys, nbreak;
 
-extern int *IK, *JK, *type, *dispBC_index, *fix_index, *nslip_vector, *lacknblist, pbc[NDIM], *pl_flag;
+extern int *IK, *JK, *type, *dispBC_index, *fix_index, *nslip_vector, *lacknblist, *pl_flag;
 extern int *nb, *nb_initial, *nb_conn, *state_v;
 extern int **neighbors, **neighbors1, **neighbors2, **neighbors_AFEM;
 extern int **K_pointer, **conn, **nsign, **cp_Jact;
 
 /* double precision float */
-extern double hx, hy, hz, angle1, angle2, angle3;
+extern double hx, hy, hz;
 extern double R_matrix[NDIM * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
 extern double cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
 extern double damage_threshold, damageb_A, damagec_A, critical_bstrain;
@@ -111,5 +111,10 @@ extern double **dL, **ddL, **bond_stress, **damage_broken, **damage_w, **bond_st
 
 extern double **Kn, **Tv, **J2_alpha, **damage_local, **damage_nonlocal, **cp_A, **cp_dgy, **cp_dA_single, **J2_beta_eq;
 extern double ***slip_vector, ***dLp, ***J2_beta, ***damage_D, ***cp_gy, ***cp_A_single;
+
+/* function prototype */
+void computeBondForceGeneral(int plmode, int temp, struct UnitCell cell);
+void initMatrices(struct UnitCell cell);
+int updateDamageGeneral(const char *dataName, int tstep, int plmode, struct UnitCell cell);
 
 #endif

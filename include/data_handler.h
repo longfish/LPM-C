@@ -6,7 +6,7 @@
 struct UnitCell;
 
 //void readLammps(const char *dataName, int skip);
-void writeDump(const char *dataName, int step, char flag, double box[]);
+void writeDump(const char *dataName, int step, char flag, double box[], double plmode);
 void writeRSS(const char *dataName, int step);
 void writeK_global(const char *dataName, int l);
 void writeDlambda(const char *dataName, int m, int n, int globalStep, int iterStep);
