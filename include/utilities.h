@@ -1,6 +1,6 @@
 #pragma once
-#ifndef LPM_BASIC_H
-#define LPM_BASIC_H
+#ifndef UTILITIES_H
+#define UTILITIES_H
 
 #include <stdio.h>
 #include "lpm.h"

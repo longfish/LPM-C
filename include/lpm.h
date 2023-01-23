@@ -28,7 +28,7 @@
 #include "neighbor.h"
 #include "solver.h"
 #include "stiffness.h"
-#include "lpm_basic.h"
+#include "utilities.h"
 #include "constitutive.h"
 
 #define PI 3.14159265358979323846
@@ -68,13 +68,6 @@ struct ForceBCs
     double step3;
 };
 
-struct BondStrain
-{
-    int i_index;
-    int j_index;
-    double bstrain;
-};
-
 struct UnitCell{
     int lattice, dim;
     int nneighbors, nneighbors1, nneighbors2;
@@ -94,9 +87,8 @@ extern int **neighbors, **neighbors1, **neighbors2, **neighbors_AFEM;
 extern int **K_pointer, **conn, **nsign, **cp_Jact;
 
 /* double precision float */
-extern double hx, hy, hz;
-extern double R_matrix[NDIM * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
-extern double cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
+extern double cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
+extern double cp_q, cp_dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
 extern double damage_threshold, damageb_A, damagec_A, critical_bstrain;
 
 extern double *K_global, *plastic_K_global, *residual, *Pin, *Pex, *Pex_temp, *disp, *sigmay, *cp_dA;

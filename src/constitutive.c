@@ -7,6 +7,13 @@
 #include "lpm.h"
 
 struct UnitCell;
+struct BondStrain
+{
+    int i_index;
+    int j_index;
+    double bstrain;
+};
+
 
 /* switch the state variables from the converged one to the current one (flag=0) or vice versa (flag=1) or gather together (flag=2) */
 void switchStateV(int conv_flag, struct UnitCell cell)
@@ -1069,7 +1076,7 @@ void computeBondForceCPMiehe(int ii, struct UnitCell cell)
                 for (int m = 0; m < nslipSys; m++)
                 {
                     // compute RSS
-                    double term1 = pow(1. + cp_gamma[m] * cp_eta / dtime, 1. / cp_p);
+                    double term1 = pow(1. + cp_gamma[m] * cp_eta / cp_dtime, 1. / cp_p);
                     cp_RSS[i][m] = stress_local[0] * schmid_tensor[m][0] +
                                    stress_local[1] * schmid_tensor[m][1] +
                                    stress_local[2] * schmid_tensor[m][2] +
@@ -1116,8 +1123,8 @@ void computeBondForceCPMiehe(int ii, struct UnitCell cell)
                              * if diagonal, the elements are (Cab + term1 + term2)
                              * if off-diagonal, the elements are (Cab + term2)
                              */
-                            double term1 = xcp_gy[k][m] * (cp_eta / cp_p / dtime * pow(1. + cp_eta * cp_gamma[m] / dtime, (1. - cp_p) / cp_p));
-                            double term2 = h_star * pow(1. + cp_eta * cp_gamma[m] / dtime, (1. / cp_p));
+                            double term1 = xcp_gy[k][m] * (cp_eta / cp_p / cp_dtime * pow(1. + cp_eta * cp_gamma[m] / cp_dtime, (1. - cp_p) / cp_p));
+                            double term2 = h_star * pow(1. + cp_eta * cp_gamma[m] / cp_dtime, (1. / cp_p));
                             if (m == n)
                                 cp_D[m * nslipSys + n] = cp_Cab[i][m * nslipSys + n] + term1 + term2;
                             else

@@ -14,7 +14,7 @@ int **K_pointer, **conn, **nsign, **cp_Jact;
 /* double precision float */
 double radius, hx, hy, hz, neighbor1_cutoff, neighbor2_cutoff, angle1, angle2, angle3, particle_volume;
 double R_matrix[NDIM * NDIM], box[2 * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
-double box_x, box_y, box_z, cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
+double box_x, box_y, box_z, cp_q, cp_dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
 double damage_threshold, damageb_A, damagec_A, critical_bstrain;
 
 double *K_global, *plastic_K_global, *residual, *Pin, *Pex, *Pex_temp, *disp, *sigmay, *cp_dA;
@@ -258,7 +258,7 @@ int main(int argc, char *argv[])
 
     // boundary conditions and whole simulation settings
     int n_steps = 150; // number of loading steps
-    dtime = 0.01;      // time step, s
+    cp_dtime = 0.01;      // time step, s
     // double step_size = -4 * 110.8; // step size for force or displacement loading
     // int n_steps = 10;        // number of loading steps
     double step_size = -1e-6; // step size for force or displacement loading

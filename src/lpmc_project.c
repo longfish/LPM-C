@@ -13,7 +13,6 @@
 ******************************************************************************/
 
 #include "lpm.h"
-// #include "examples/ex0_elasticity_3d.c"
 
 /* definition of global variables */
 /* int */
@@ -27,9 +26,8 @@ int **neighbors, **neighbors1, **neighbors2, **neighbors_AFEM;
 int **K_pointer, **conn, **nsign, **cp_Jact;
 
 /* double precision float */
-double hx, hy, hz;
-double R_matrix[NDIM * NDIM], cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
-double cp_q, dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
+double cp_tau0[3], cp_taus[3], cp_eta, cp_p, cp_h0, cp_q, cp_maxloop;
+double cp_q, cp_dtime, cp_theta, J2_H, J2_xi, J2_C, damage_L;
 double damage_threshold, damageb_A, damagec_A, critical_bstrain;
 
 double *K_global, *plastic_K_global, *residual, *Pin, *Pex, *Pex_temp, *disp, *sigmay, *cp_dA;
@@ -56,7 +54,7 @@ int main(int argc, char *argv[])
     printf("==================================================\n");
 
     const int nt = omp_get_max_threads(); /* maximum number of threads provided by the computer */
-    const int nt_force = 4;               /* number of threads for general force calculation */
+    const int nt_force = 2;               /* number of threads for general force calculation */
 
     printf("OpenMP with %d/%d threads for bond force calculation\n", nt_force, nt);
 
@@ -82,39 +80,19 @@ int main(int argc, char *argv[])
     // flag is 0 ~ 2 for different conventions, (0: direct rotation; 1: Kocks convention; 2: Bunge convention)
     // angle1, angle2 and an angle3 are Euler angles in degree, double
     int eulerflag = 0; // direct rotation
-    double angles[] = {PI / 180.0 * 0.0, PI / 180.0 * 0.0, PI / 180.0 * 0.0};
+    double angles[] = {PI / 180.0 * 45.0, PI / 180.0 * 0.0, PI / 180.0 * 0.0};
+    double *R_matrix = createRMatrix(eulerflag, angles);
 
     // create a simulation box
     // xmin; xmax; ymin; ymax; zmin; zmax
     double box[] = {-0.2, 10.2, -0.2, 10.2, -0.2, 10.2};
-    createCuboid(box, cell, eulerflag, angles);
+    createCuboid(box, cell, R_matrix);
 
     // move the particles coordinates
     double offset[] = {-0., -0., -0.};
     moveParticle(box, offset);
 
-    // create a pre-existed crack
-    // double ca1 = -10.0, ca2 = 5 + 0.3 * radius, w = 0.372, ch = 10.0287;
-    // createCrack(ca1, ca2, w, ch);
-    // removeBlock(-10.0, 5.4128, 9.9386, 10.002, -100, 100);
-
-    // modify the configuration
-    // removeBlock(-10.0, 10.0, 35.0, 100.0, -100, 100);
-    // removeBlock(-10.0, 10.0, -100.0, 13.0, -100, 100);
-    // double pc1[3] = {9.9, 13.13, 0.0}, pc2[3] = {9.9, 34.91, 0.0};
-    // removeCircle(pc1, 5., 'z'); // remove the particles inside the half circle
-    // removeCircle(pc2, 5., 'z');
-
-    // cut the cuboid and get a cylinder along z direction
-    // double pc[3] = {12.5, 12.5, 25.0};
-    // createCylinderz(pc, 12.5);
-    // removeRingz(pc, 10.0, 5.0);
-
-    // cut the 3D cuboid and get a dog-bone specimen
-    // double pc[3] = {9.0, 9.0, 20.0};
-    // createCylinderz(pc, 9.0);  // cylinder test specimen
-    // removeRingz(pc, 9.0, 4.0); // remove a ring
-
+    // initialize the necessary matrices
     initMatrices(cell);
     copyDouble2D(xyz_initial, xyz, nparticle, NDIM);
 
@@ -228,7 +206,7 @@ int main(int argc, char *argv[])
 
     // boundary conditions and whole simulation settings
     int n_steps = 5;           // number of loading steps
-    dtime = 0.01;               // time step, s
+    cp_dtime = 0.01;               // time step, s
     double step_size = -2000.0; // step size for force or displacement loading
     // int n_steps = 10;        // number of loading steps
     // double step_size = -2e-3; // step size for force or displacement loading
@@ -269,7 +247,7 @@ int main(int argc, char *argv[])
     computedL();
 
     // crystal lattice settings
-    slipSysDefine3D(cell); // define slip systems for cubic systems
+    slipSysDefine3D(cell, R_matrix); // define slip systems for cubic systems
     if (lattice == 3 || lattice == 4)
         computeCab(cell);
 
@@ -352,7 +330,7 @@ int main(int argc, char *argv[])
         int ni = 0;
         while (norm_residual > TOLITER * tol_multiplier && ni < MAXITER)
         {
-            printf("Step-%d, iteration-%d: ", i + 1, ni++);
+            printf("Step-%d, iteration-%d: ", i + 1, ++ni);
 
             switchStateV(0, cell); // copy the last converged state variable [1] into current one [0]
 

@@ -86,26 +86,8 @@ struct UnitCell createUnitCell(int lattice, double radius)
     return cell;
 }
 
-void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angles[])
+double *createRMatrix(int eulerflag, double angles[])
 {
-    int i, j, k, n, nparticle_t, particles_first_row, rows, layers;
-    double x, y, z, a, angle1, angle2, angle3;
-    double **xyz_t, p[3] = {0};
-
-    /* settings for matrix-vector product, BLAS */
-    CBLAS_LAYOUT layout = CblasRowMajor;
-    CBLAS_TRANSPOSE trans = CblasNoTrans;
-
-    int lda = 3, incx = 1, incy = 1;
-    double blasAlpha = 1.0, blasBeta = 0.0;
-
-    if (cell.dim == 2)
-        a = sqrt(pow(box[1]-box[0], 2) + pow(box[3]-box[2], 2));
-    else
-        a = sqrt(pow(box[1]-box[0], 2) + pow(box[3]-box[2], 2) + pow(box[5]-box[4], 2));
-
-    double box_t[6] = {-a, a, -a, a, -a, a};
-
     /* Below notations are referred to wiki: https://en.wikipedia.org/wiki/Euler_angles */
     /* 1, 2, 3 represent the rotation angles angle1, angle2, gamma */
     /* x, y, z represent fixed frames */
@@ -121,7 +103,9 @@ void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angl
     // R = [c3  -s3   0]  or R = [c3  -s3]
     //     [s3   c3   0]         [s3   c3]
     //     [0     0   1]
-    angle1 = angles[0], angle2 = angles[1], angle3 = angles[2];
+
+    double angle1 = angles[0], angle2 = angles[1], angle3 = angles[2];
+    static double R_matrix[NDIM*NDIM];
 
     if (eulerflag == 0)
     {
@@ -177,11 +161,34 @@ void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angl
         R_matrix[8] = cos(angle2);
     }
 
+    return R_matrix;
+}
+
+void createCuboid(double box[], struct UnitCell cell, double R_matrix[])
+{
+    int i, j, k, n, nparticle_t, particles_first_row, rows, layers;
+    double x, y, z, a;
+    double **xyz_t, p[3] = {0};
+
+    /* settings for matrix-vector product, BLAS */
+    CBLAS_LAYOUT layout = CblasRowMajor;
+    CBLAS_TRANSPOSE trans = CblasNoTrans;
+
+    int lda = 3, incx = 1, incy = 1;
+    double blasAlpha = 1.0, blasBeta = 0.0;
+
+    if (cell.dim == 2)
+        a = sqrt(pow(box[1]-box[0], 2) + pow(box[3]-box[2], 2));
+    else
+        a = sqrt(pow(box[1]-box[0], 2) + pow(box[3]-box[2], 2) + pow(box[5]-box[4], 2));
+
+    double box_t[6] = {-a, a, -a, a, -a, a};
+
     if (cell.lattice == 0) /* 2D square lattice (double layer neighbor) */
     {
         /* model parameters */
-        hx = 2 * cell.radius;
-        hy = hx;
+        double hx = 2 * cell.radius;
+        double hy = hx;
         particles_first_row = floor((box_t[1] - box_t[0]) / hx);
         rows = floor((box_t[3] - box_t[2]) / hy);
 
@@ -237,8 +244,8 @@ void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angl
     if (cell.lattice == 1) /* 2D hexagon lattice (double layer neighbor) */
     {
         /* model parameters */
-        hx = 2 * cell.radius;
-        hy = hx * sqrt(3.0) / 2.0;
+        double hx = 2 * cell.radius;
+        double hy = hx * sqrt(3.0) / 2.0;
         particles_first_row = 1 + floor((box_t[1] - box_t[0]) / hx);
         rows = 1 + floor((box_t[3] - box_t[2]) / hy);
 
@@ -305,9 +312,9 @@ void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angl
     if (cell.lattice == 2) /* simple cubic */
     {
         /* model parameters */
-        hx = 2 * cell.radius;
-        hy = hx;
-        hz = hx;
+        double hx = 2 * cell.radius;
+        double hy = hx;
+        double hz = hx;
         particles_first_row = 1 + (int)floor((box_t[1] - box_t[0]) / hx);
         rows = 1 + (int)floor((box_t[3] - box_t[2]) / hy);
         layers = 1 + (int)floor((box_t[5] - box_t[4]) / hz);
@@ -380,9 +387,9 @@ void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angl
     if (cell.lattice == 3) /* face centered cubic  */
     {
         /* model parameters */
-        hx = 4 * cell.radius / sqrt(2.0);
-        hy = hx;
-        hz = hx;
+        double hx = 4 * cell.radius / sqrt(2.0);
+        double hy = hx;
+        double hz = hx;
         particles_first_row = 1 + (int)floor((box_t[1] - box_t[0]) / hx);
         rows = 1 + (int)floor((box_t[3] - box_t[2]) / (hy / 2.0));
         layers = 1 + (int)floor((box_t[5] - box_t[4]) / (hz / 2.0));
@@ -502,9 +509,9 @@ void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angl
     if (cell.lattice == 4) /* body centered cubic  */
     {
         /* model parameters */
-        hx = 4.0 / sqrt(3.0) * cell.radius;
-        hy = hx;
-        hz = hx;
+        double hx = 4.0 / sqrt(3.0) * cell.radius;
+        double hy = hx;
+        double hz = hx;
         particles_first_row = 1 + (int)floor((box_t[1] - box_t[0]) / hx);
         rows = 1 + (int)floor((box_t[3] - box_t[2]) / hy);
         layers = 1 + (int)floor((box_t[5] - box_t[4]) / (hz / 2.0));
@@ -591,7 +598,7 @@ void createCuboid(double box[], struct UnitCell cell, int eulerflag, double angl
 }
 
 /* define the slip systems for crystal plasticity calculations */
-void slipSysDefine3D(struct UnitCell cell)
+void slipSysDefine3D(struct UnitCell cell, double R_matrix[])
 {
     if (cell.lattice == 3) /* face centered cubic  */
     {
