@@ -3,14 +3,14 @@
  * general cases(2 layers of neighbors)
  * This code can deal with general elastic and plasticity problems under careful
  * modifications
- * 
- * Supported lattice types: 
- *     2D square, 2D hexagon, 3D simple cubic, 3D BCC & FCC crystal(crystal 
+ *
+ * Supported lattice types:
+ *     2D square, 2D hexagon, 3D simple cubic, 3D BCC & FCC crystal(crystal
  *     plasticity simulation)
- * 
+ *
  * Contact information:
  *     Changyu Meng, PhD candidate, Arizona State University, cmeng12@asu.edu
-******************************************************************************/
+ ******************************************************************************/
 
 #include "lpm.h"
 
@@ -43,7 +43,6 @@ double **dL, **ddL, **bond_stress, **damage_broken, **damage_w, **bond_stretch, 
 double **Kn, **Tv, **J2_alpha, **damage_local, **damage_nonlocal, **cp_A, **cp_dgy, **cp_dA_single, **J2_beta_eq;
 double ***slip_vector, ***dLp, ***J2_beta, ***damage_D, ***cp_gy, ***cp_A_single;
 
-
 /************************************************************************/
 /****************************** Main procedure **************************/
 /************************************************************************/
@@ -73,19 +72,19 @@ int main(int argc, char *argv[])
     // body-centered cubic with 2 types of slip systems -> 5
     // body-centered cubic with 3 types of slip systems -> 6
     int lattice = 2;
-    double radius = 0.2499999944120646;
+    double radius = 0.8;
     struct UnitCell cell = createUnitCell(lattice, radius); /*lattice type is 2, simple cubic*/
 
     // Euler angles setting for system rotation
     // flag is 0 ~ 2 for different conventions, (0: direct rotation; 1: Kocks convention; 2: Bunge convention)
     // angle1, angle2 and an angle3 are Euler angles in degree, double
     int eulerflag = 0; // direct rotation
-    double angles[] = {PI / 180.0 * 45.0, PI / 180.0 * 0.0, PI / 180.0 * 0.0};
+    double angles[] = {PI / 180.0 * 0.0, PI / 180.0 * 0.0, PI / 180.0 * 0.0};
     double *R_matrix = createRMatrix(eulerflag, angles);
 
     // create a simulation box
     // xmin; xmax; ymin; ymax; zmin; zmax
-    double box[] = {-0.2, 10.2, -0.2, 10.2, -0.2, 10.2};
+    double box[] = {-0., 10., -0.4, 10., -0.4, 30.};
     createCuboid(box, cell, R_matrix);
 
     // move the particles coordinates
@@ -102,21 +101,21 @@ int main(int argc, char *argv[])
     searchNormalNeighbor(cell);
     int len_K_global = searchAFEMNeighbor(cell);
 
-    //printf("Neighbor-searching finished, stiffness matrix size is %d\n", len_K_global);
+    // printf("Neighbor-searching finished, stiffness matrix size is %d\n", len_K_global);
 
     // assign types for particles located in different rectangular regions
     // xlo, xhi, ylo, yhi, zlo, zhi, type
     int ntype = 0;
     type = allocInt1D(nparticle, ntype++); // set particle type as 0 in default
 
-    setTypeRect(-100.0, 100.0, -100.0, 100.0, 10 - 1.2 * radius, 100.0, ntype++); // top layer, type 1,
-    setTypeRect(-100.0, 100.0, -100.0, 100.0, -100.0, 1.2 * radius, ntype++);     // lower layer, type 2
+    setTypeRect(-100.0, 100.0, -100.0, 100.0, 30 - 2 * radius, 100.0, ntype++); // top layer, type 1,
+    setTypeRect(-100.0, 100.0, -100.0, 100.0, -100.0, 2 * radius, ntype++);     // lower layer, type 2
 
     setTypeFullNeighbor(ntype++, cell); // set the particle type as 3 if the neighbor list is full
 
     // material elastic parameters setting, MPa
     double C11, C12, C44;
-    double E0 = 146e3, mu0 = 0.3;
+    double E0 = 69e3, mu0 = 0.3;
     // plane strain or 3D
     C11 = E0 * (1.0 - mu0) / (1.0 + mu0) / (1.0 - 2.0 * mu0);
     C12 = E0 * mu0 / (1.0 + mu0) / (1.0 - 2.0 * mu0);
@@ -205,11 +204,11 @@ int main(int argc, char *argv[])
     char bforceFile[] = "result_bforce.txt";
 
     // boundary conditions and whole simulation settings
-    int n_steps = 5;           // number of loading steps
-    cp_dtime = 0.01;               // time step, s
-    double step_size = -2000.0; // step size for force or displacement loading
+    int n_steps = 1; // number of loading steps
+    cp_dtime = 0.01; // time step, s
+    // double step_size = -2000.0; // step size for force or displacement loading
     // int n_steps = 10;        // number of loading steps
-    // double step_size = -2e-3; // step size for force or displacement loading
+    double step_size = -1e-3; // step size for force or displacement loading
 
     int nbd = 0, nbf = 0;     // total number of disp or force boundary conditions
     char cal_method[] = "cg"; // calculation method, pardiso or conjugate gradient
@@ -218,28 +217,30 @@ int main(int argc, char *argv[])
     int load_indicator[MAXLINE] = {0}; // tension (1) or compressive (-1) loading condition for uniaxial loading
 
     // displace boundary conditions
-    // for (int i = 0; i < n_steps; i++)
-    // {
-    //     nbd = 0;
-    //     load_indicator[i] = 1;
-    //     dBP[i][nbd].type = 1, dBP[i][nbd].flag = 'z', dBP[i][nbd++].step = 0.0;
-    //     dBP[i][nbd].type = 2, dBP[i][nbd].flag = 'z', dBP[i][nbd++].step = step_size;
-    // }
-
-    // force boundary conditions
     for (int i = 0; i < n_steps; i++)
     {
-        load_indicator[i] = 1;
-
         nbd = 0;
+        load_indicator[i] = 1;
+        dBP[i][nbd].type = 1, dBP[i][nbd].flag = 'x', dBP[i][nbd++].step = 0.0;
+        dBP[i][nbd].type = 1, dBP[i][nbd].flag = 'y', dBP[i][nbd++].step = 0.0;
         dBP[i][nbd].type = 1, dBP[i][nbd].flag = 'z', dBP[i][nbd++].step = 0.0;
-
-        nbf = 0;
-        fBP[i][nbf].type = 2;
-        fBP[i][nbf].flag1 = 'x', fBP[i][nbf].step1 = 0.0;
-        fBP[i][nbf].flag2 = 'y', fBP[i][nbf].step2 = 0.0;
-        fBP[i][nbf].flag3 = 'z', fBP[i][nbf++].step3 = step_size;
+        dBP[i][nbd].type = 2, dBP[i][nbd].flag = 'z', dBP[i][nbd++].step = step_size;
     }
+
+    // force boundary conditions
+    // for (int i = 0; i < n_steps; i++)
+    // {
+    //     load_indicator[i] = 1;
+
+    //     nbd = 0;
+    //     dBP[i][nbd].type = 1, dBP[i][nbd].flag = 'z', dBP[i][nbd++].step = 0.0;
+
+    //     nbf = 0;
+    //     fBP[i][nbf].type = 2;
+    //     fBP[i][nbf].flag1 = 'x', fBP[i][nbf].step1 = 0.0;
+    //     fBP[i][nbf].flag2 = 'y', fBP[i][nbf].step2 = 0.0;
+    //     fBP[i][nbf].flag3 = 'z', fBP[i][nbf++].step3 = step_size;
+    // }
 
     /************************** Simulation begins *************************/
     // compute necessary into before loading starts
@@ -429,6 +430,12 @@ int main(int argc, char *argv[])
         printf("Time costed for step %d: %f seconds\n\n", i + 1, finishrun - startrun);
     }
 
+    // output stiffness matrix info
+    writeK_global("out_K_global.txt", K_pointer[nparticle][1]);
+    writeK_pointer("out_K_pointer.txt", nparticle + 1);
+    writeK_IK("out_IK.txt", cell.dim * nparticle + 1);
+    writeK_JK("out_JK.txt", K_pointer[nparticle][1]);
+
     computeBondStretch(cell);
     computeBondForce(cell);
     writeBondforce(bforceFile, 0, cell);
@@ -530,7 +537,7 @@ int updateDamageGeneral(const char *dataName, int tstep, int plmode, struct Unit
 /* allocate memories for some global matrices */
 void initMatrices(struct UnitCell cell)
 {
-    disp = allocDouble1D(cell.dim * nparticle, 0);        /* global displacement vector */
+    disp = allocDouble1D(cell.dim * nparticle, 0);   /* global displacement vector */
     xyz_initial = allocDouble2D(nparticle, NDIM, 0); /* store coordinate information as 3D */
     xyz_temp = allocDouble2D(nparticle, NDIM, 0);
 
@@ -571,7 +578,7 @@ void initMatrices(struct UnitCell cell)
     K_pointer = allocInt2D(nparticle + 1, 2, 0);
 
     residual = allocDouble1D(cell.dim * nparticle, 0);  /* right hand side, residual */
-    Pin = allocDouble1D(NDIM * nparticle, 0);      /* total internal force, fixed 3 dimension */
+    Pin = allocDouble1D(NDIM * nparticle, 0);           /* total internal force, fixed 3 dimension */
     Pex = allocDouble1D(cell.dim * nparticle, 0);       /* total external force */
     Pex_temp = allocDouble1D(cell.dim * nparticle, 0);  /* temp external force */
     dispBC_index = allocInt1D(cell.dim * nparticle, 1); /* disp info for each degree of freedom, 0 as being applied disp BC */
@@ -587,9 +594,9 @@ void initMatrices(struct UnitCell cell)
     damage_broken = allocDouble2D(nparticle, cell.nneighbors, 1.); /* crack index parameter */
     damage_D = allocDouble3D(nparticle, cell.nneighbors, 2, 0.);   /* bond-associated damage parameter, initially be 0, state variable */
     damage_w = allocDouble2D(nparticle, cell.nneighbors, 1.);      /* intact parameter, apply on bond force */
-    damage_visual = allocDouble1D(nparticle, 0.0);            /* damage indicator for visualization */
-    damage_local = allocDouble2D(nparticle, 2, 0.0);          /* damage variable used in continuum damage mechanics */
-    damage_nonlocal = allocDouble2D(nparticle, 2, 0.0);       /* nonlocal damage variable used in continuum damage mechanics */
+    damage_visual = allocDouble1D(nparticle, 0.0);                 /* damage indicator for visualization */
+    damage_local = allocDouble2D(nparticle, 2, 0.0);               /* damage variable used in continuum damage mechanics */
+    damage_nonlocal = allocDouble2D(nparticle, 2, 0.0);            /* nonlocal damage variable used in continuum damage mechanics */
 
     F = allocDouble2D(nparticle, cell.nneighbors, 0.);          /* FIJ is total bond force between I and J */
     F_temp = allocDouble2D(nparticle, cell.nneighbors, 0.);     /* F_tempIJ stores the bond force at last time step */

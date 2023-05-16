@@ -86,6 +86,7 @@ void setDispBC_stiffnessUpdate2D(struct UnitCell cell)
 
     /* compute the norm of the diagonal */
     double norm_diag = cblas_dnrm2(cell.dim * nparticle, diag, 1); /* Euclidean norm (L2 norm) */
+    // printf("%.5e\n", norm_diag);
     // double norm_diag = 1e4;
 
     /* update the stiffness matrix */
@@ -173,8 +174,8 @@ void setDispBC_stiffnessUpdate3D(struct UnitCell cell)
     }
 
     /* compute the norm of the diagonal */
-    double norm_diag = cblas_dnrm2(cell.dim * nparticle, diag, 1); /* Euclidean norm (L2 norm) */
-
+    double norm_diag = 1e4;//cblas_dnrm2(cell.dim * nparticle, diag, 1); /* Euclidean norm (L2 norm) */
+    
     //printf("norm: %f\n", norm_diag);
     /* update the stiffness matrix */
     for (int i = 0; i < nparticle; i++)

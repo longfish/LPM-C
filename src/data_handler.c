@@ -405,6 +405,42 @@ void writeK_global(const char *dataName, int l)
     fclose(fpt);
 }
 
+void writeK_pointer(const char *dataName, int l)
+{
+    FILE *fpt;
+    fpt = fopen(dataName, "w+");
+    for (int i = 0; i < l; i++)
+    {
+        fprintf(fpt, " %d\n", K_pointer[i][1]);
+    }
+
+    fclose(fpt);
+}
+
+void writeK_IK(const char *dataName, int l)
+{
+    FILE *fpt;
+    fpt = fopen(dataName, "w+");
+    for (int i = 0; i < l; i++)
+    {
+        fprintf(fpt, " %d\n", IK[i]);
+    }
+
+    fclose(fpt);
+}
+
+void writeK_JK(const char *dataName, int l)
+{
+    FILE *fpt;
+    fpt = fopen(dataName, "w+");
+    for (int i = 0; i < l; i++)
+    {
+        fprintf(fpt, " %d\n", JK[i]);
+    }
+
+    fclose(fpt);
+}
+
 /* write the plasticity multiplier array into file, from m to n (not included) indices */
 void writeDlambda(const char *dataName, int m, int n, int globalStep, int iterStep)
 {
